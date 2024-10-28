@@ -87,19 +87,21 @@ const Usuario = {
       fields.push("password_usuario = ?");
       values.push(data.password_usuario);
     }
-
-    console.log("Campos a actualizar:", fields);
-    console.log("Valores a usar:", values);
+    if (data.ingresos !== undefined) {
+      // Añadido campo de ingresos
+      fields.push("ingresos = ?");
+      values.push(data.ingresos);
+    }
 
     if (fields.length === 0) {
       return callback(new Error("No hay campos para actualizar"), null);
     }
 
     const query = `
-      UPDATE usuarios
-      SET ${fields.join(", ")}
-      WHERE usuario_id = ?
-    `;
+    UPDATE usuarios
+    SET ${fields.join(", ")}
+    WHERE usuario_id = ?
+  `;
     values.push(usuario_id);
 
     db.query(query, values, (err, result) => {
