@@ -1,7 +1,7 @@
 # Node.js modules
 node_modules/
 
-# Environment variables
+# Environment variables (en producción, usa una variable de entorno real)
 .env
 
 # Logs
@@ -9,15 +9,14 @@ logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log*
 pnpm-debug.log*
 
-# Dependency directories
+# Dependency directories (si usas cobertura en producción, no ignores coverage/)
 coverage/
 
-# Production files and builds
-build/
-dist/
+# Production files and builds (quita `build/` y `dist/` si contienen tu código compilado)
+# build/
+# dist/
 
 # System files
 .DS_Store

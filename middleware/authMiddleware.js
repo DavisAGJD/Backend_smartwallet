@@ -2,14 +2,22 @@ const jwt = require("jsonwebtoken");
 
 // Middleware de verificación de token
 const verificarToken = (req, res, next) => {
-  const token = req.headers["authorization"]?.split(" ")[1]; // Extrae el token del header
+  const token = req.headers["authorization"]?.split(" ")[1];
   if (!token) return res.status(403).json({ error: "Token no proporcionado" });
 
   jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
     if (err) return res.status(403).json({ error: "Token inválido" });
-    req.userId = decoded.id; // Guarda el ID de usuario para la solicitud
+    req.userId = decoded.id;
+    req.rol = decoded.rol; // Almacena el rol del usuario
     next();
   });
 };
 
-module.exports = { verificarToken };
+const verificarAdmin = (req, res, next) => {
+  if (req.rol !== "admin") {
+    return res.status(403).json({ error: "No tienes permiso para acceder a esta ruta" });
+  }
+  next();
+};
+
+module.exports = { verificarToken, verificarAdmin};
