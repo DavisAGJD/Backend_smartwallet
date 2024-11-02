@@ -1,9 +1,10 @@
 const express = require("express");
 const app = express();
 require("dotenv").config();
-const cors = require('cors');
-require('./cronJobs');
+const cors = require("cors");
+require("./cronJobs"); // Asegúrate de que este archivo exista y se esté usando correctamente
 const port = process.env.PORT;
+
 const usuariosRoutes = require("./routes/usuariosRoutes");
 const categoriasMetasRoutes = require("./routes/categoriasMetasRoutes");
 const categoriasGastosRoutes = require("./routes/categoriasGastosRoutes");
@@ -14,9 +15,14 @@ const reportesRoutes = require("./routes/reportesRoutes");
 const ingresoRoutes = require("./routes/ingresoRoutes");
 const notificacionesRoutes = require("./routes/notificacionesRoutes");
 
-app.use(cors()); 
+app.use(
+  cors({
+    origin: "https://smartwallet-front.vercel.app", // Cambia este URL por el dominio de tu frontend
+    methods: ["GET", "POST", "PUT", "DELETE"], // Define los métodos permitidos
+    credentials: true, // Si usas cookies o autenticación basada en sesiones
+  })
+);
 app.use(express.json());
-
 
 app.use("/api/usuarios", usuariosRoutes);
 app.use("/api/categoriasMetas", categoriasMetasRoutes);
