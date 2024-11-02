@@ -11,6 +11,19 @@ const getRecordatorios = (req, res) => {
   });
 };
 
+const getRecordatoriosByUserId = (req, res) => {
+  const { usuario_id } = req.params;
+
+  Recordatorio.getByUserId(usuario_id, (err, data) => {
+    if (err) {
+      return res
+        .status(500)
+        .json({ error: "Error al obtener los recordatorios del usuario" });
+    }
+    res.status(200).json(data);
+  });
+};
+
 const postRecordatorio = (req, res) => {
   const { usuario_id, descripcion, fecha_recordatorio } = req.body;
 
@@ -112,6 +125,7 @@ const deleteRecordatorio = (req, res) => {
 
 module.exports = {
   getRecordatorios,
+  getRecordatoriosByUserId,
   postRecordatorio,
   putRecordatorio,
   deleteRecordatorio

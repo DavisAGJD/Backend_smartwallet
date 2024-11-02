@@ -115,7 +115,7 @@ const loginUsuario = (req, res) => {
 
 const putUsuario = (req, res) => {
   const { usuario_id } = req.params;
-  const { nombre_usuario, email, password_usuario } = req.body;
+  const { nombre_usuario, email, password_usuario, ingresos } = req.body;
 
   // Construir dinámicamente los datos a actualizar
   let updateData = {};
@@ -132,6 +132,11 @@ const putUsuario = (req, res) => {
     // Encriptar la nueva contraseña
     const hashedPassword = bcrypt.hashSync(password_usuario, 8);
     updateData.password_usuario = hashedPassword;
+  }
+
+  if (ingresos !== undefined) {
+    // Asegurarse de incluir el campo ingresos si está en el cuerpo de la solicitud
+    updateData.ingresos = ingresos;
   }
 
   // Verificar si hay campos para actualizar

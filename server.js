@@ -2,6 +2,7 @@ const express = require("express");
 const app = express();
 require("dotenv").config();
 const cors = require('cors');
+require('./cronJobs');
 const port = process.env.PORT;
 const usuariosRoutes = require("./routes/usuariosRoutes");
 const categoriasMetasRoutes = require("./routes/categoriasMetasRoutes");
@@ -11,6 +12,7 @@ const metasAhorroRoutes = require("./routes/metasAhorroRoutes");
 const recordatoriosRoutes = require("./routes/recordatoriosRoutes");
 const reportesRoutes = require("./routes/reportesRoutes");
 const ingresoRoutes = require("./routes/ingresoRoutes");
+const notificacionesRoutes = require("./routes/notificacionesRoutes");
 
 app.use(cors()); 
 app.use(express.json());
@@ -24,6 +26,7 @@ app.use("/api/metas", metasAhorroRoutes);
 app.use("/api/recordatorios", recordatoriosRoutes);
 app.use("/api/reportes", reportesRoutes);
 app.use("/api/ingresos", ingresoRoutes);
+app.use("/api/notificaciones", notificacionesRoutes);
 
 app.listen(port, () => {
   console.log(`Servidor prendido desde http://localhost:${port}`);
