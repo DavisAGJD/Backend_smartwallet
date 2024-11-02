@@ -37,6 +37,27 @@ async function generarNotificacionesDeMetas() {
   });
 }
 
+// Nueva función para metas vencidas
+async function generarNotificacionesDeMetasVencidas() {
+  const metasVencidas = await obtenerMetasVencidas();
+
+  metasVencidas.forEach(async (meta) => {
+    const porcentajeAhorrado = (meta.monto_actual / meta.monto_objetivo) * 100;
+
+    const mensaje = `Lo sentimos, no has podido cumplir la meta: ${meta.nombre_meta}. Solo lograste ahorrar ${meta.monto_actual}. No te desanimes, ¡enfócate en mejorar las otras metas!`;
+
+    // Enviar notificación al usuario
+    await Notificacion.create({
+      usuario_id: meta.usuario_id,
+      tipo: "meta_vencida",
+      mensaje,
+    });
+
+    // Eliminar la meta vencida de la base de datos
+    await eliminarMeta(meta.meta_id);
+  });
+}
+
 async function generarNotificacionesDeRecordatorios() {
   const recordatorios = await obtenerRecordatoriosProximos();
 
@@ -77,6 +98,32 @@ async function eliminarNotificacionesViejas() {
   });
 }
 
+// Nuevas funciones para obtener metas vencidas y eliminar una meta
+const obtenerMetasVencidas = async () => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT meta_id, usuario_id, nombre_meta, monto_objetivo, monto_actual, fecha_limite
+      FROM metas_de_ahorro
+      WHERE fecha_limite < CURDATE() AND monto_actual < monto_objetivo
+    `;
+    db.query(query, (err, results) => {
+      if (err) return reject(err);
+      resolve(results);
+    });
+  });
+};
+
+const eliminarMeta = async (metaId) => {
+  return new Promise((resolve, reject) => {
+    const query = `DELETE FROM metas_de_ahorro WHERE meta_id = ?`;
+    db.query(query, [metaId], (err, result) => {
+      if (err) return reject(err);
+      resolve(result);
+    });
+  });
+};
+
+// Otros métodos para obtener usuarios, gastos y recordatorios
 const obtenerUsuarios = async () => {
   return new Promise((resolve, reject) => {
     const query = "SELECT usuario_id, ingresos FROM usuarios";
@@ -104,7 +151,7 @@ const obtenerGastosDelMes = async (usuarioId) => {
 const obtenerMetas = async () => {
   return new Promise((resolve, reject) => {
     const query = `
-      SELECT meta_id, usuario_id, nombre_meta, monto_objetivo, monto_actual
+      SELECT meta_id, usuario_id, nombre_meta, monto_objetivo, monto_actual, fecha_limite
       FROM metas_de_ahorro
     `;
     db.query(query, (err, results) => {
@@ -132,5 +179,6 @@ module.exports = {
   generarNotificacionesDeGastos,
   generarNotificacionesDeMetas,
   generarNotificacionesDeRecordatorios,
-  eliminarNotificacionesViejas
+  eliminarNotificacionesViejas,
+  generarNotificacionesDeMetasVencidas // Exportamos la nueva función
 };

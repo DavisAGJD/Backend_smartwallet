@@ -3,7 +3,8 @@ const {
   generarNotificacionesDeGastos,
   generarNotificacionesDeMetas,
   generarNotificacionesDeRecordatorios,
-  eliminarNotificacionesViejas
+  eliminarNotificacionesViejas,
+  generarNotificacionesDeMetasVencidas
 } = require("./controllers/notificacionAutomaticaController");
 
 cron.schedule("0 */4 * * *", () => {
@@ -15,4 +16,6 @@ cron.schedule("0 */4 * * *", () => {
   generarNotificacionesDeRecordatorios();
   console.log("Ejecutando limpieza diaria de notificaciones viejas...");
   eliminarNotificacionesViejas();
+  console.log("Ejecutando análisis para metas vencidas...");
+  generarNotificacionesDeMetasVencidas();
 });
