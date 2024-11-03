@@ -4,6 +4,8 @@ require("dotenv").config();
 const cors = require("cors");
 require("./cronJobs"); // Asegúrate de que este archivo exista y se esté usando correctamente
 const port = process.env.PORT;
+const NEWS_API_KEY = process.env.NEWS_API_KEY;
+
 
 const usuariosRoutes = require("./routes/usuariosRoutes");
 const categoriasMetasRoutes = require("./routes/categoriasMetasRoutes");
@@ -33,6 +35,22 @@ app.use("/api/recordatorios", recordatoriosRoutes);
 app.use("/api/reportes", reportesRoutes);
 app.use("/api/ingresos", ingresoRoutes);
 app.use("/api/notificaciones", notificacionesRoutes);
+
+app.get("/api/articles", async (req, res) => {
+  const { keyword = "finance" } = req.query;
+  const url = `https://newsapi.org/v2/everything?q=${keyword}&language=es&sortBy=publishedAt&apiKey=${NEWS_API_KEY}`;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("Error fetching articles");
+
+    const data = await response.json();
+    res.json(data.articles);
+  } catch (error) {
+    console.error("Error en la solicitud al NewsAPI:", error);
+    res.status(500).json({ error: "Error fetching articles" });
+  }
+});
 
 app.listen(port, () => {
   console.log(`Servidor prendido desde http://localhost:${port}`);
