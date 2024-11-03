@@ -42,15 +42,19 @@ app.get("/api/articles", async (req, res) => {
 
   try {
     const response = await fetch(url);
-    if (!response.ok) throw new Error("Error fetching articles");
+    if (!response.ok) {
+      console.error(`Error en NewsAPI: ${response.status} - ${response.statusText}`);
+      throw new Error(`NewsAPI error: ${response.statusText}`);
+    }
 
     const data = await response.json();
     res.json(data.articles);
   } catch (error) {
     console.error("Error en la solicitud al NewsAPI:", error);
-    res.status(500).json({ error: "Error fetching articles" });
+    res.status(500).json({ error: error.message });
   }
 });
+
 
 app.listen(port, () => {
   console.log(`Servidor prendido desde http://localhost:${port}`);
