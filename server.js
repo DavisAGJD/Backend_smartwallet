@@ -17,7 +17,7 @@ const notificacionesRoutes = require("./routes/notificacionesRoutes");
 
 app.use(
   cors({
-    origin: " http://localhost:5173", // Cambia este URL por el dominio de tu frontend
+    origin: "https://smartwallet-front.vercel.app", // Cambia este URL por el dominio de tu frontend
     methods: ["GET", "POST", "PUT", "DELETE"], // Define los métodos permitidos
     credentials: true, // Si usas cookies o autenticación basada en sesiones
   })
