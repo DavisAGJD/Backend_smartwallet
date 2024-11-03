@@ -1,12 +1,13 @@
 const express = require("express");
 const app = express();
 require("dotenv").config();
+const fetch = (...args) => import("node-fetch").then(({ default: fetch }) => fetch(...args));
 const cors = require("cors");
-require("./cronJobs"); // Asegúrate de que este archivo exista y se esté usando correctamente
+require("./cronJobs");
 const port = process.env.PORT;
-const NEWS_API_KEY = process.env.NEWS_API_KEY;
+const NEWS_API_KEY = process.env.NEWSDATA_API_KEY;
 
-
+// Importa tus rutas existentes
 const usuariosRoutes = require("./routes/usuariosRoutes");
 const categoriasMetasRoutes = require("./routes/categoriasMetasRoutes");
 const categoriasGastosRoutes = require("./routes/categoriasGastosRoutes");
@@ -17,15 +18,17 @@ const reportesRoutes = require("./routes/reportesRoutes");
 const ingresoRoutes = require("./routes/ingresoRoutes");
 const notificacionesRoutes = require("./routes/notificacionesRoutes");
 
+// Configuración de CORS
 app.use(
   cors({
     origin: "https://smartwallet-front.vercel.app", // Cambia este URL por el dominio de tu frontend
-    methods: ["GET", "POST", "PUT", "DELETE"], // Define los métodos permitidos
-    credentials: true, // Si usas cookies o autenticación basada en sesiones
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true, // Para cookies o sesiones
   })
 );
 app.use(express.json());
 
+// Asignación de rutas
 app.use("/api/usuarios", usuariosRoutes);
 app.use("/api/categoriasMetas", categoriasMetasRoutes);
 app.use("/api/categoriasGastos", categoriasGastosRoutes);
@@ -36,26 +39,31 @@ app.use("/api/reportes", reportesRoutes);
 app.use("/api/ingresos", ingresoRoutes);
 app.use("/api/notificaciones", notificacionesRoutes);
 
+// Ruta para obtener artículos de NewsData.io
 app.get("/api/articles", async (req, res) => {
   const { keyword = "finance" } = req.query;
-  const url = `https://newsapi.org/v2/everything?q=${keyword}&language=es&sortBy=publishedAt&apiKey=${NEWS_API_KEY}`;
+  const url = `https://newsdata.io/api/1/news?apikey=${NEWS_API_KEY}&q=${keyword}&language=es`;
 
   try {
+    console.log("Solicitando artículos de NewsData.io:", url); // Log para verificar URL
     const response = await fetch(url);
+
+    // Verifica si la respuesta es válida
     if (!response.ok) {
-      console.error(`Error en NewsAPI: ${response.status} - ${response.statusText}`);
-      throw new Error(`NewsAPI error: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Error fetching articles: ${errorText}`);
     }
 
     const data = await response.json();
-    res.json(data.articles);
+    console.log("Artículos recibidos de NewsData.io:", data.results); // Log de los resultados
+    res.json(data.results); // Envía los artículos al frontend
   } catch (error) {
-    console.error("Error en la solicitud al NewsAPI:", error);
-    res.status(500).json({ error: error.message });
+    console.error("Error en la solicitud a NewsData.io:", error);
+    res.status(500).json({ error: "Error fetching articles" });
   }
 });
 
-
+// Configuración del puerto del servidor
 app.listen(port, () => {
-  console.log(`Servidor prendido desde http://localhost:${port}`);
+  console.log(`Servidor en ejecución en http://localhost:${port}`);
 });
