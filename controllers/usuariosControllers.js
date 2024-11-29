@@ -96,22 +96,55 @@ const loginUsuario = (req, res) => {
       return res.status(401).json({ error: "Contraseña incorrecta" });
     }
 
-    // Generar token JWT incluyendo el rol del usuario
-    const token = jwt.sign(
-      { id: user.usuario_id, rol: user.rol }, // Incluye el rol en el token
-      process.env.JWT_SECRET,
-      {
-        expiresIn: 86400, // 24 horas
-      }
-    );
+    const today = new Date();
+    let streak = user.racha || 0; // Inicializamos la racha desde el campo de racha
 
-    res.status(200).json({
-      message: "Login exitoso",
-      token: token, // Enviar token al cliente
-      rol: user.rol, // Enviar rol al cliente
+    if (user.first_login) {
+      // Si tiene primer login registrado, comparamos las fechas
+      const firstLoginDate = new Date(user.first_login);
+      const lastLoginDate = new Date(user.last_login);
+
+      const diffTime = today - lastLoginDate; // Diferencia en milisegundos
+      const diffDays = diffTime / (1000 * 3600 * 24); // Diferencia en días
+
+      if (diffDays === 1) {
+        // Si el último login fue ayer, incrementamos la racha
+        streak += 1;
+      } else if (diffDays > 1) {
+        // Si han pasado más de 1 día, reiniciamos la racha
+        streak = 1;
+      }
+    } else {
+      // Si es el primer login, inicializamos el primer login y la racha a 1
+      streak = 1;
+    }
+
+    // Actualizamos la fecha de last_login y la racha
+    Usuario.updateLoginInfo(user.usuario_id, today, today, streak, (updateErr, result) => {
+      if (updateErr) {
+        console.error("Error al actualizar la racha:", updateErr);
+        return res.status(500).json({ error: "Error al actualizar la racha" });
+      }
+
+      // Generamos el token JWT
+      const token = jwt.sign(
+        { id: user.usuario_id, rol: user.rol }, // Incluye el rol en el token
+        process.env.JWT_SECRET,
+        {
+          expiresIn: 86400, // 24 horas
+        }
+      );
+
+      res.status(200).json({
+        message: "Login exitoso",
+        token: token, // Enviar token al cliente
+        racha: streak, // Enviar la racha al cliente
+        rol: user.rol, // Enviar rol al cliente
+      });
     });
   });
 };
+
 
 const putUsuario = (req, res) => {
   const { usuario_id } = req.params;
@@ -205,11 +238,107 @@ const deleteUsuario = (req, res) => {
   });
 };
 
+// Endpoint para canjear la recompensa
+const canjearRecompensaPremium = (req, res) => {
+  const usuario_id = req.userId; // El ID del usuario del middleware
+  const puntosRequeridos = 100;
+
+  // Comprobar si el usuario tiene suficientes puntos
+  const query = `SELECT puntos FROM usuarios WHERE usuario_id = ?`;
+  db.query(query, [usuario_id], (err, results) => {
+    if (err) {
+      console.error("Error al obtener los puntos del usuario:", err);
+      return res.status(500).json({ error: "Error al obtener los puntos" });
+    }
+
+    const puntosUsuario = results[0].puntos;
+    if (puntosUsuario < puntosRequeridos) {
+      return res.status(400).json({
+        error: "No tienes suficientes puntos para canjear esta recompensa.",
+      });
+    }
+
+    // Restar los puntos y actualizar la suscripción
+    const nuevaFechaVencimiento = new Date();
+    nuevaFechaVencimiento.setDate(nuevaFechaVencimiento.getDate() + 2); // Agregar 2 días
+
+    const updateQuery = `UPDATE usuarios SET puntos = puntos - ?, tipo_suscripcion = 'premium', fecha_vencimiento_premium = ? WHERE usuario_id = ?`;
+    db.query(
+      updateQuery,
+      [puntosRequeridos, nuevaFechaVencimiento, usuario_id],
+      (err, result) => {
+        if (err) {
+          console.error("Error al actualizar la suscripción:", err);
+          return res
+            .status(500)
+            .json({ error: "Error al actualizar la suscripción" });
+        }
+
+        return res
+          .status(200)
+          .json({ message: "Recompensa canjeada exitosamente" });
+      }
+    );
+  });
+};
+
+const getPuntosUsuario = (req, res) => {
+  const { usuario_id } = req.params;
+
+  // Consultar los puntos del usuario en la base de datos
+  const query = "SELECT puntos FROM usuarios WHERE usuario_id = ?";
+
+  db.query(query, [usuario_id], (err, result) => {
+    if (err) {
+      console.error(`Error al obtener los puntos del usuario: ${err}`);
+      return res
+        .status(500)
+        .json({ error: "Error al obtener los puntos del usuario" });
+    }
+
+    if (result.length === 0) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+
+    // Devolver los puntos al cliente
+    res.status(200).json({ puntos: result[0].puntos, usuario_id: usuario_id });
+  });
+};
+
+const getUsuarioById = (req, res) => {
+  const usuarioId = req.params.id; // ID del usuario desde la ruta
+  const tokenUsuarioId = req.usuarioId; // ID extraído del token
+
+  if (usuarioId !== tokenUsuarioId) {
+    return res
+      .status(403)
+      .json({ error: "No tienes permisos para acceder a estos datos" });
+  }
+
+  // Buscar el usuario en la base de datos usando el ID
+  Usuario.getById(usuarioId, (err, data) => {
+    if (err) {
+      return res
+        .status(500)
+        .json({ error: "Error al obtener la información del usuario" });
+    }
+
+    if (!data) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    res.status(200).json(data); // Devolver los datos del usuario
+  });
+};
+
 module.exports = {
   getUsuarios,
   getInfoUsuarios,
+  getUsuarioById,
   createUsuarios,
   loginUsuario,
   putUsuario,
   deleteUsuario,
+  canjearRecompensaPremium,
+  getPuntosUsuario,
 };

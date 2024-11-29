@@ -59,15 +59,30 @@ const postMetaAhorro = (req, res) => {
     categoria_meta_id,
   };
 
+  // Crear la nueva meta
   MetaAhorro.create(usuario_id, nuevaMeta, (err, data) => {
     if (err) {
       console.error(`Error al crear la meta: ${err}`);
       return res.status(500).json({ error: "Error al crear la meta" });
     }
 
-    res.status(201).json({
-      message: "Meta añadida exitosamente",
-      data: data,
+    // Lógica para agregar puntos cuando se crea una meta
+    const puntos = 20; // Número de puntos por meta creada (ajustar según sea necesario)
+
+    // Llamamos al modelo de Usuario para actualizar los puntos
+    MetaAhorro.agregarPuntos(usuario_id, puntos, (err, result) => {
+      if (err) {
+        console.error(`Error al actualizar puntos del usuario: ${err}`);
+        return res
+          .status(500)
+          .json({ error: "Error al actualizar los puntos" });
+      }
+
+      res.status(201).json({
+        message: "Meta añadida exitosamente y puntos actualizados",
+        data: data,
+        puntos: puntos, // Devuelves los puntos obtenidos
+      });
     });
   });
 };
@@ -158,6 +173,40 @@ const deleteMetaAhorro = (req, res) => {
   });
 };
 
+const cumplirMetaAhorro = (req, res) => {
+  const { meta_id } = req.params;  // meta_id viene en los parámetros de la URL
+  const usuario_id = req.userId;   // Aquí se obtiene el userId desde el middleware
+
+  // Eliminar la meta
+  MetaAhorro.delete(meta_id, (err, data) => {
+    if (err) {
+      console.error(`Error al eliminar la meta: ${err}`);
+      return res.status(500).json({ error: "Error al eliminar la meta" });
+    }
+
+    if (data.affectedRows === 0) {
+      return res.status(404).json({ message: "Meta no encontrada" });
+    }
+
+    // Agregar puntos al usuario después de eliminar la meta
+    const puntos = 50;  // Los puntos que gana el usuario por completar la meta
+    MetaAhorro.agregarPuntos(usuario_id, puntos, (err, result) => {
+      if (err) {
+        console.error("Error al agregar puntos:", err);
+        return res.status(500).json({ error: "Error al agregar puntos" });
+      }
+
+      // Si todo va bien, enviamos la respuesta con el mensaje y los puntos
+      res.status(200).json({
+        message: "Meta eliminada exitosamente y 50 puntos agregados",
+        puntos: puntos,  // Enviamos los puntos ganados al front
+      });
+    });
+  });
+};
+
+
+
 module.exports = {
   getMetasAhorro,
   getMetasByUserId,
@@ -166,4 +215,5 @@ module.exports = {
   putMetaAhorro,
   putMontoActual,
   deleteMetaAhorro,
+  cumplirMetaAhorro,
 };

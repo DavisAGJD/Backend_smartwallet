@@ -11,5 +11,6 @@ router.post("/create", token.verificarToken  ,metasAhorroController.postMetaAhor
 router.put("/update/:meta_id", metasAhorroController.putMetaAhorro);
 router.put("/updateMonto/:meta_id", metasAhorroController.putMontoActual);
 router.delete("/delete/:meta_id", metasAhorroController.deleteMetaAhorro);
+router.delete("/delete/metaexitosa/:meta_id", token.verificarToken, metasAhorroController.cumplirMetaAhorro);
 
 module.exports = router;

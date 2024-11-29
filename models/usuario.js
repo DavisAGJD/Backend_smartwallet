@@ -9,6 +9,20 @@ const Usuario = {
     });
   },
 
+  // En el modelo Usuario
+  getById: (id, callback) => {
+    db.query(
+      "SELECT * FROM usuarios WHERE usuario_id = ?",
+      [id],
+      (err, results) => {
+        if (err) {
+          return callback(err, null);
+        }
+        callback(null, results[0]); // Devuelve el primer usuario que coincida con el ID
+      }
+    );
+  },
+
   // Obtener el total de usuarios
   getTotalUsuarios: (callback) => {
     const query = "SELECT COUNT(*) AS totalUsuarios FROM usuarios";
@@ -117,6 +131,13 @@ const Usuario = {
       if (err) return callback(err, null);
       callback(null, result);
     });
+  },
+
+  // Método para actualizar la información de login
+  updateLoginInfo: (usuarioId, firstLogin, lastLogin, racha, callback) => {
+    const query = `UPDATE usuarios SET first_login = ?, last_login = ?, racha = ? WHERE usuario_id = ?`;
+    const values = [firstLogin, lastLogin, racha, usuarioId];
+    db.query(query, values, callback);
   },
 };
 

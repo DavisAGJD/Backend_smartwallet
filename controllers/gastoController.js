@@ -33,26 +33,39 @@ const getGastoByCategoria = (req, res) => {
   });
 };
 
-
 const postGasto = (req, res) => {
   const { monto, categoria_gasto_id, descripcion } = req.body;
   const usuario_id = req.userId; // Obtenemos usuario_id del token
 
+  // Datos para crear el nuevo gasto
   const nuevoGasto = {
     monto,
     categoria_gasto_id,
     descripcion,
   };
 
+  // Llamamos al modelo para crear el gasto
   Gasto.create(usuario_id, nuevoGasto, (err, data) => {
     if (err) {
       console.error(`Error al crear gasto: ${err}`);
       return res.status(500).json({ error: "Error al crear gasto" });
     }
 
-    res.status(201).json({
-      message: "Gasto añadido exitosamente",
-      data: data,
+    // Lógica para agregar puntos cuando se añade un gasto
+    const puntos = 10; // Número de puntos por gasto (ajustar según sea necesario)
+
+    // Actualizar puntos después de crear el gasto
+    Gasto.agregarPuntos(usuario_id, puntos, (err, result) => {
+      if (err) {
+        return res.status(500).json({ error: "Error al actualizar los puntos" });
+      }
+
+      // Devuelves los puntos obtenidos junto con el gasto creado
+      res.status(201).json({
+        message: "Gasto añadido exitosamente y puntos actualizados",
+        data: data,
+        puntos: puntos,  // Devuelves los puntos obtenidos
+      });
     });
   });
 };
@@ -73,11 +86,15 @@ const putGasto = (req, res) => {
 
   Gasto.updateData(id_gasto, usuario_id, updateData, (err, result) => {
     if (err) {
-      return res.status(500).json({ error: "Error al actualizar gasto", detalles: err });
+      return res
+        .status(500)
+        .json({ error: "Error al actualizar gasto", detalles: err });
     }
 
     if (result.affectedRows === 0) {
-      return res.status(403).json({ message: "No tienes permiso para editar este gasto o no existe" });
+      return res.status(403).json({
+        message: "No tienes permiso para editar este gasto o no existe",
+      });
     }
 
     res.status(200).json({
@@ -86,7 +103,6 @@ const putGasto = (req, res) => {
     });
   });
 };
-
 
 const deleteGasto = (req, res) => {
   const { id_gasto } = req.params;

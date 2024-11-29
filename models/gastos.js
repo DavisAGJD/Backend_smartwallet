@@ -18,13 +18,12 @@ const Gasto = {
       JOIN categorias_gasto ON gastos.categoria_gasto_id = categorias_gasto.categoria_gasto_id
       WHERE gastos.usuario_id = ?
     `;
-    
+
     db.query(query, [usuario_id], (err, results) => {
       if (err) return callback(err, null);
       callback(null, results);
     });
   },
-  
 
   getByCategoriaId: (categoria_gasto_id, callback) => {
     const query = "SELECT * FROM gastos WHERE categoria_gasto_id = ?";
@@ -68,13 +67,21 @@ const Gasto = {
         callback(null, result);
       }
     );
-},
-
+  },
 
   // Eliminar un gasto por ID
   delete: (id_gasto, callback) => {
     const query = "DELETE FROM gastos WHERE id_gasto = ?";
     db.query(query, [id_gasto], (err, result) => {
+      if (err) return callback(err, null);
+      callback(null, result);
+    });
+  },
+
+  agregarPuntos: (usuario_id, puntos, callback) => {
+    const query =
+      "UPDATE usuarios SET puntos = puntos + ? WHERE usuario_id = ?";
+    db.query(query, [puntos, usuario_id], (err, result) => {
       if (err) return callback(err, null);
       callback(null, result);
     });

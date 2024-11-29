@@ -111,6 +111,15 @@ const MetaAhorro = {
       callback(null, result);
     });
   },
+
+  agregarPuntos: (usuario_id, puntos, callback) => {
+    const query =
+      "UPDATE usuarios SET puntos = puntos + ? WHERE usuario_id = ?";
+    db.query(query, [puntos, usuario_id], (err, result) => {
+      if (err) return callback(err, null);
+      callback(null, result);
+    });
+  },
 };
 
 module.exports = MetaAhorro;
