@@ -69,6 +69,18 @@ const Usuario = {
     });
   },
 
+  getUsuariosPaginados: (offset, limit, callback) => {
+    const query = `
+      SELECT nombre_usuario, fecha_registro, tipo_suscripcion
+      FROM usuarios
+      LIMIT ? OFFSET ?
+    `;
+    db.query(query, [limit, offset], (err, results) => {
+      if (err) return callback(err, null);
+      callback(null, results);
+    });
+  },
+
   create: (data, callback) => {
     const { nombre_usuario, email, password_usuario } = data;
     const query = `
