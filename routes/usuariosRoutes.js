@@ -13,7 +13,7 @@ router.delete("/delete/:usuario_id", usuariosController.deleteUsuario)
 router.post("/suscripcion/:usuario_id", verificarToken,  usuariosController.canjearRecompensaPremium)
 router.get('/puntos/:usuario_id', verificarToken, usuariosController.getPuntosUsuario);
 router.get('/info-user/:id', verificarToken , usuariosController.getUsuarioById);
-router.get('/info-user/cookbook/:id', usuariosController.getUsuarioById);
+router.get('/cookbook/info-user/:id', usuariosController.getUsuarioById);
 
 
 module.exports = router
