@@ -5,7 +5,7 @@ const { verificarToken } = require("../middleware/authMiddleware");
 
 router.get("/", usuariosController.getUsuarios);
 router.get("/info", usuariosController.getInfoUsuarios);
-router.get("/cookbook/info-user/:id", usuariosController.getUsuarioById);
+router.get("/cookbook/info-user/:id", usuariosController.getUsuarioByIdCookBook);
 router.post("/register", usuariosController.createUsuarios);
 router.get("/paginados", usuariosController.getUsuariosPaginados);
 router.post("/login", usuariosController.loginUsuario);

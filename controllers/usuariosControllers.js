@@ -364,6 +364,26 @@ const getUsuariosPaginados = (req, res) => {
   });
 };
 
+
+const getUsuarioByIdCookBook = (req, res) => {
+  const usuarioId = req.params.id; // ID del usuario desde la ruta
+
+  // Buscar el usuario en la base de datos usando el ID
+  Usuario.getById(usuarioId, (err, data) => {
+    if (err) {
+      return res
+        .status(500)
+        .json({ error: "Error al obtener la información del usuario" });
+    }
+
+    if (!data) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    res.status(200).json(data); // Devolver los datos del usuario
+  });
+};
+
 module.exports = {
   getUsuarios,
   getInfoUsuarios,
@@ -374,5 +394,6 @@ module.exports = {
   deleteUsuario,
   canjearRecompensaPremium,
   getPuntosUsuario,
-  getUsuariosPaginados
+  getUsuariosPaginados,
+  getUsuarioByIdCookBook
 };
