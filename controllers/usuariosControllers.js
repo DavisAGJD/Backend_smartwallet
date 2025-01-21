@@ -331,6 +331,39 @@ const getUsuarioById = (req, res) => {
   });
 };
 
+const getUsuariosPaginados = (req, res) => {
+  const page = parseInt(req.query.page) || 1; // Página actual (por defecto 1)
+  const limit = parseInt(req.query.limit) || 10; // Límite de elementos por página (por defecto 10)
+  const offset = (page - 1) * limit; // Cálculo del offset
+
+  // Llamar al modelo para obtener los usuarios paginados
+  Usuario.getUsuariosPaginados(offset, limit, (err, data) => {
+    if (err) {
+      return res.status(500).json({ error: "Error al obtener usuarios paginados" });
+    }
+
+    // Obtener el total de usuarios para calcular el número total de páginas
+    Usuario.getTotalUsuarios((err, total) => {
+      if (err) {
+        return res.status(500).json({ error: "Error al obtener el total de usuarios" });
+      }
+
+      const totalPages = Math.ceil(total / limit); // Calcular el número total de páginas
+
+      // Respuesta con los datos paginados y metadatos
+      res.status(200).json({
+        data: data,
+        pagination: {
+          total: total,
+          page: page,
+          pageSize: limit,
+          totalPages: totalPages,
+        },
+      });
+    });
+  });
+};
+
 module.exports = {
   getUsuarios,
   getInfoUsuarios,
@@ -341,4 +374,5 @@ module.exports = {
   deleteUsuario,
   canjearRecompensaPremium,
   getPuntosUsuario,
+  getUsuariosPaginados
 };
