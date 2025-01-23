@@ -121,6 +121,39 @@ const deleteGasto = (req, res) => {
   });
 };
 
+const getGastosPaginados = (req, res) => {
+  const page = parseInt(req.query.page) || 1; // Página actual (por defecto 1)
+  const limit = parseInt(req.query.limit) || 10; // Límite de elementos por página (por defecto 10)
+  const offset = (page - 1) * limit; // Cálculo del offset
+
+  // Llamar al modelo para obtener los gastos paginados
+  Gasto.getGastosPaginados(offset, limit, (err, data) => {
+    if (err) {
+      return res.status(500).json({ error: "Error al obtener gastos paginados" });
+    }
+
+    // Obtener el total de gastos para calcular el número total de páginas
+    Gasto.getTotalGastos((err, total) => {
+      if (err) {
+        return res.status(500).json({ error: "Error al obtener el total de gastos" });
+      }
+
+      const totalPages = Math.ceil(total / limit); // Calcular el número total de páginas
+
+      // Respuesta con los datos paginados y metadatos
+      res.status(200).json({
+        data: data,
+        pagination: {
+          total: total,
+          page: page,
+          pageSize: limit,
+          totalPages: totalPages,
+        },
+      });
+    });
+  });
+};
+
 module.exports = {
   getGastos,
   getGastoByUserId,
@@ -128,4 +161,5 @@ module.exports = {
   postGasto,
   putGasto,
   deleteGasto,
+  getGastosPaginados
 };

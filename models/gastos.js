@@ -9,6 +9,18 @@ const Gasto = {
       callback(null, results);
     });
   },
+  getGastosPaginados: (offset, limit, callback) => {
+    const query = `
+      SELECT * FROM gastos
+      LIMIT ? OFFSET ?
+    `;
+    db.query(query, [limit, offset], (err, results) => {
+      if (err) {
+        return callback(err, null);
+      }
+      callback(null, results);
+    });
+  },
 
   // Obtener todos los gastos de un usuario por ID
   getByUserId: (usuario_id, callback) => {
