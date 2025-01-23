@@ -63,6 +63,19 @@ const Gasto = {
     );
   },
 
+  getTotalGastos: (callback) => {
+    const query = `
+      SELECT COUNT(*) AS total FROM gastos
+    `;
+    db.query(query, (err, results) => {
+      if (err) {
+        return callback(err, null);
+      }
+      callback(null, results[0].total); // Devuelve el total de gastos
+    });
+  },
+
+
   // Actualizar un gasto por ID
   updateData: (id_gasto, usuario_id, data, callback) => {
     const { monto, categoria_gasto_id, descripcion } = data;
