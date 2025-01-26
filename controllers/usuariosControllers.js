@@ -120,31 +120,38 @@ const loginUsuario = (req, res) => {
     }
 
     // Actualizamos la fecha de last_login y la racha
-    Usuario.updateLoginInfo(user.usuario_id, today, today, streak, (updateErr, result) => {
-      if (updateErr) {
-        console.error("Error al actualizar la racha:", updateErr);
-        return res.status(500).json({ error: "Error al actualizar la racha" });
-      }
-
-      // Generamos el token JWT
-      const token = jwt.sign(
-        { id: user.usuario_id, rol: user.rol }, // Incluye el rol en el token
-        process.env.JWT_SECRET,
-        {
-          expiresIn: 86400, // 24 horas
+    Usuario.updateLoginInfo(
+      user.usuario_id,
+      today,
+      today,
+      streak,
+      (updateErr, result) => {
+        if (updateErr) {
+          console.error("Error al actualizar la racha:", updateErr);
+          return res
+            .status(500)
+            .json({ error: "Error al actualizar la racha" });
         }
-      );
 
-      res.status(200).json({
-        message: "Login exitoso",
-        token: token, // Enviar token al cliente
-        racha: streak, // Enviar la racha al cliente
-        rol: user.rol, // Enviar rol al cliente
-      });
-    });
+        // Generamos el token JWT
+        const token = jwt.sign(
+          { id: user.usuario_id, rol: user.rol }, // Incluye el rol en el token
+          process.env.JWT_SECRET,
+          {
+            expiresIn: 86400, // 24 horas
+          }
+        );
+
+        res.status(200).json({
+          message: "Login exitoso",
+          token: token, // Enviar token al cliente
+          racha: streak, // Enviar la racha al cliente
+          rol: user.rol, // Enviar rol al cliente
+        });
+      }
+    );
   });
 };
-
 
 const putUsuario = (req, res) => {
   const { usuario_id } = req.params;
@@ -309,6 +316,9 @@ const getUsuarioById = (req, res) => {
   const usuarioId = req.params.id; // ID del usuario desde la ruta
   const tokenUsuarioId = req.userId; // ID extraído del token
 
+  console.log("usuarioId:", usuarioId); // Imprime el usuarioId de la solicitud
+  console.log("tokenUsuarioId:", tokenUsuarioId);
+
   if (usuarioId !== tokenUsuarioId) {
     return res
       .status(403)
@@ -339,13 +349,17 @@ const getUsuariosPaginados = (req, res) => {
   // Llamar al modelo para obtener los usuarios paginados
   Usuario.getUsuariosPaginados(offset, limit, (err, data) => {
     if (err) {
-      return res.status(500).json({ error: "Error al obtener usuarios paginados" });
+      return res
+        .status(500)
+        .json({ error: "Error al obtener usuarios paginados" });
     }
 
     // Obtener el total de usuarios para calcular el número total de páginas
     Usuario.getTotalUsuarios((err, total) => {
       if (err) {
-        return res.status(500).json({ error: "Error al obtener el total de usuarios" });
+        return res
+          .status(500)
+          .json({ error: "Error al obtener el total de usuarios" });
       }
 
       const totalPages = Math.ceil(total / limit); // Calcular el número total de páginas
@@ -363,7 +377,6 @@ const getUsuariosPaginados = (req, res) => {
     });
   });
 };
-
 
 const getUsuarioByIdCookBook = (req, res) => {
   const usuarioId = req.params.id; // ID del usuario desde la ruta
@@ -395,5 +408,5 @@ module.exports = {
   canjearRecompensaPremium,
   getPuntosUsuario,
   getUsuariosPaginados,
-  getUsuarioByIdCookBook
+  getUsuarioByIdCookBook,
 };
