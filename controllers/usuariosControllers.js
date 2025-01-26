@@ -319,26 +319,26 @@ const getUsuarioById = (req, res) => {
   console.log("usuarioId:", usuarioId); // Imprime el usuarioId de la solicitud
   console.log("tokenUsuarioId:", tokenUsuarioId);
 
-  if (usuarioId !== tokenUsuarioId) {
+  if (usuarioId == tokenUsuarioId) {
+    // Buscar el usuario en la base de datos usando el ID
+    Usuario.getById(usuarioId, (err, data) => {
+      if (err) {
+        return res
+          .status(500)
+          .json({ error: "Error al obtener la información del usuario" });
+      }
+
+      if (!data) {
+        return res.status(404).json({ error: "Usuario no encontrado" });
+      }
+
+      res.status(200).json(data); // Devolver los datos del usuario
+    });
+  } else {
     return res
       .status(403)
       .json({ error: "No tienes permisos para acceder a estos datos" });
   }
-
-  // Buscar el usuario en la base de datos usando el ID
-  Usuario.getById(usuarioId, (err, data) => {
-    if (err) {
-      return res
-        .status(500)
-        .json({ error: "Error al obtener la información del usuario" });
-    }
-
-    if (!data) {
-      return res.status(404).json({ error: "Usuario no encontrado" });
-    }
-
-    res.status(200).json(data); // Devolver los datos del usuario
-  });
 };
 
 const getUsuariosPaginados = (req, res) => {
