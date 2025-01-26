@@ -313,29 +313,19 @@ const getPuntosUsuario = (req, res) => {
 };
 
 const getUsuarioById = (req, res) => {
-  const usuarioId = req.params.id; // ID del usuario desde la ruta (cadena o número)
-  const tokenUsuarioId = req.usuarioId; // ID extraído del token (cadena o número)
+  const usuarioId = req.params.id; // ID del usuario desde la ruta
+  const tokenUsuarioId = req.userId; // ID extraído del token
 
-  console.log('usuarioId:', usuarioId); // Imprime el usuarioId de la solicitud
-  console.log('tokenUsuarioId:', tokenUsuarioId); // Imprime el usuarioId del token
+  console.log("usuarioId:", usuarioId); // Imprime el usuarioId de la solicitud
+  console.log("tokenUsuarioId:", tokenUsuarioId);
 
-  // Convierte ambos valores a enteros antes de compararlos
-  const usuarioIdInt = parseInt(usuarioId, 10);
-  const tokenUsuarioIdInt = parseInt(tokenUsuarioId, 10);
-
-  // Verifica si la conversión a enteros fue exitosa
-  if (isNaN(usuarioIdInt) || isNaN(tokenUsuarioIdInt)) {
-    return res.status(400).json({ error: "Los IDs no son válidos" });
-  }
-
-  // Compara los valores como enteros
-  if (usuarioIdInt !== tokenUsuarioIdInt) {
+  if (usuarioId !== tokenUsuarioId) {
     return res
       .status(403)
       .json({ error: "No tienes permisos para acceder a estos datos" });
   }
 
-  // Si los valores son iguales, continuar con la solicitud
+  // Buscar el usuario en la base de datos usando el ID
   Usuario.getById(usuarioId, (err, data) => {
     if (err) {
       return res
