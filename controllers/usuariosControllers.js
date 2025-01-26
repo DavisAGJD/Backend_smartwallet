@@ -307,7 +307,7 @@ const getPuntosUsuario = (req, res) => {
 
 const getUsuarioById = (req, res) => {
   const usuarioId = req.params.id; // ID del usuario desde la ruta
-  const tokenUsuarioId = req.usuarioId; // ID extraído del token
+  const tokenUsuarioId = req.userId; // ID extraído del token
 
   if (usuarioId !== tokenUsuarioId) {
     return res
