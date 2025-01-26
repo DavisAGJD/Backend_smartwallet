@@ -313,13 +313,12 @@ const getPuntosUsuario = (req, res) => {
 };
 
 const getUsuarioById = (req, res) => {
-  const usuarioId = req.params.id; // ID del usuario desde la ruta
-  const tokenUsuarioId = req.userId; // ID extraído del token
+  const usuarioId = req.params.id; // ID del usuario desde la ruta (cadena)
+  const tokenUsuarioId = req.usuarioId; // ID extraído del token (número o cadena)
 
-  console.log("usuarioId:", usuarioId); // Imprime el usuarioId de la solicitud
-  console.log("tokenUsuarioId:", tokenUsuarioId);
 
-  if (usuarioId !== tokenUsuarioId) {
+  // Convierte ambos valores a cadenas antes de compararlos
+  if (String(usuarioId) !== String(tokenUsuarioId)) {
     return res
       .status(403)
       .json({ error: "No tienes permisos para acceder a estos datos" });
