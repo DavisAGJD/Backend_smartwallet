@@ -4,6 +4,8 @@ import re
 import sys
 import json
 
+pytesseract.pytesseract.tesseract_cmd = r'/usr/bin/tesseract'
+
 
 def procesar_imagen(ruta_imagen):
     """
