@@ -3,9 +3,10 @@ import pytesseract
 import re
 import sys
 import json
+import os
 
-pytesseract.pytesseract.tesseract_cmd = r'/usr/bin/tesseract
-
+pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
+os.environ['TESSDATA_PREFIX'] = os.path.join(os.getcwd(), 'tessdata')
 
 def procesar_imagen(ruta_imagen):
     """
@@ -140,12 +141,20 @@ def analizar_ticket(ruta_imagen):
         }
     except Exception as e:
         return {'error': str(e)}
-
+    
+    
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print(json.dumps({'error': 'Número inválido de argumentos'}))
-        sys.exit(1)
+    try:
+        if len(sys.argv) != 2:
+            print(json.dumps({'error': 'Número inválido de argumentos'}))
+            sys.exit(1)
+            
+        ruta_imagen = sys.argv[1]
+        resultados = analizar_ticket(ruta_imagen)
+        print(json.dumps(resultados, ensure_ascii=False))
         
-    ruta_imagen = sys.argv[1]
-    resultados = analizar_ticket(ruta_imagen)
-    print(json.dumps(resultados))
+    except Exception as e:
+        print(json.dumps({
+            'error': 'Error inesperado',
+            'detalle': str(e).replace('\n', ' ')
+        }))
