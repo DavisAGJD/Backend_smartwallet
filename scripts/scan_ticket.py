@@ -1,70 +1,67 @@
 from PIL import Image
-import pytesseract
+import easyocr
 import re
 import sys
 import json
 import os
-import requests
+import numpy as np
 
+# Inicializar el lector de EasyOCR para español (usa GPU si está disponible; en Render probablemente se usará CPU)
+reader = easyocr.Reader(['es'], gpu=False)
 
-pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
-
-tessdata_url = "https://github.com/tesseract-ocr/tessdata/raw/main/spa.traineddata"
-response = requests.get(tessdata_url)
-with open("spa.traineddata", "wb") as f:
-    f.write(response.content)
-
-pytesseract.pytesseract.tesseract_args = [
-    '--tessdata-dir', '.',  # Usar directorio actual
-    '--psm', '4',
-    '--oem', '3'
-]
-
-# Verificar existencia del modelo de idioma
-if not os.path.exists(os.path.join(os.environ['TESSDATA_PREFIX'], 'spa.traineddata')):
-    raise Exception(f"Modelo español no encontrado en: {os.environ['TESSDATA_PREFIX']}")
+def parse_number(num_str):
+    """
+    Convierte una cadena numérica a float, tratando de detectar si la coma es separador decimal o
+    si es usada como separador de miles.
+    Ejemplos:
+      "1,234.56" -> 1234.56
+      "1234,56"  -> 1234.56
+    """
+    num_str = num_str.strip().replace(' ', '')
+    # Si no hay punto y sí hay coma, asumimos que la coma es decimal
+    if '.' not in num_str and ',' in num_str:
+        return float(num_str.replace(',', '.'))
+    else:
+        return float(num_str.replace(',', ''))
 
 def procesar_imagen(ruta_imagen):
     """
-    Preprocesa la imagen para optimizar la extracción de texto.
-    Se aplica conversión a escala de grises, mejora de contraste y escalado.
-    Además se realiza OCR con dos configuraciones (PSM 4 y PSM 6) y se selecciona
-    el resultado que presente mayor cantidad de dígitos (heurística para textos numéricos).
-    """
-    img = Image.open(ruta_imagen)
+    Preprocesa la imagen para optimizar la extracción de texto:
+      - Convierte a escala de grises.
+      - Mejora el contraste aplicando un umbral.
+      - Escala la imagen (duplica sus dimensiones).
+      - Convierte a RGB y la pasa a un array de NumPy.
+      - Realiza OCR usando EasyOCR.
     
+    Devuelve el texto extraído en mayúsculas.
+    """
+    # Abrir imagen con Pillow
+    img = Image.open(ruta_imagen)
+
     # Convertir a escala de grises
     img = img.convert('L')
-    
-    # Mejorar contraste con un umbral intermedio (compromiso entre 150 y 160)
+
+    # Mejorar contraste aplicando un umbral (compromiso entre 150 y 160)
     img = img.point(lambda x: 0 if x < 155 else 255)
-    
+
     # Escalar la imagen para mejorar la legibilidad
     img = img.resize((img.width * 2, img.height * 2))
-    
-    # Realizar OCR con dos configuraciones:
-    texto_psm4 = pytesseract.image_to_string(
-        img,
-        config='--psm 4 --oem 3',
-        lang='spa'
-    )
-    texto_psm6 = pytesseract.image_to_string(
-        img,
-        config='--psm 6 --oem 3',
-        lang='spa'
-    )
-    
-    # Heurística: se selecciona el texto que tenga mayor cantidad de dígitos
-    if sum(c.isdigit() for c in texto_psm4) >= sum(c.isdigit() for c in texto_psm6):
-        texto = texto_psm4
-    else:
-        texto = texto_psm6
 
+    # Convertir la imagen a RGB (EasyOCR suele funcionar mejor con 3 canales)
+    img_rgb = img.convert('RGB')
+    img_np = np.array(img_rgb)
+
+    # Realizar OCR con EasyOCR; detail=0 devuelve solo el texto
+    resultados = reader.readtext(img_np, detail=0)
+    
+    # Unir las líneas detectadas en un solo bloque de texto
+    texto = "\n".join(resultados)
     return texto.upper()
 
 def detectar_tienda(texto):
     """
-    Identifica la tienda a partir del texto OCR, permitiendo errores comunes de OCR.
+    Identifica la tienda a partir del texto OCR, permitiendo errores comunes.
+    Se evalúan distintos patrones sobre cada línea del texto.
     """
     patrones = {
         r'(SUPER\s?AKI|AKI\sGH|AKT\sGH|SUPER\.?AKI|SUP\sAKI)': 'Super Aki',
@@ -76,61 +73,68 @@ def detectar_tienda(texto):
         r'.*S[O0]R[I1][A4]N[A4].*': 'Soriana',
         r'SORIANA': 'Soriana'
     }
-    
+
     # Evaluar línea por línea para mayor tolerancia a errores de OCR
     for linea in texto.split('\n'):
         for patron, nombre in patrones.items():
             if re.search(patron, linea, re.IGNORECASE):
                 return nombre
-    
-    # Detección adicional si "AKI" aparece en la dirección o datos de la tienda
+
+    # Detección adicional si "AKI" aparece en el texto
     if re.search(r'AKI', texto, re.IGNORECASE):
         return 'Super Aki'
-    
-    return 'Desconocida'
 
+    return 'Desconocida'
 
 def extraer_total(texto):
     """
-    Extrae el total del ticket utilizando múltiples estrategias combinadas:
-      1. Buscar patrones de TOTAL con variaciones y posibles errores (por ejemplo, T0TAL).
-      2. Buscar TOTAL con símbolo de moneda.
+    Extrae el total del ticket utilizando múltiples estrategias:
+      1. Buscar patrones de "TOTAL" con posibles errores (p.ej. T0TAL).
+      2. Buscar "TOTAL" acompañado de símbolo de moneda.
       3. Buscar secciones como "MONTO:".
-      4. Calcular a partir de EFECTIVO - CAMBIO (se prueba con dos variantes de patrones).
+      4. Calcular a partir de EFECTIVO - CAMBIO (dos variantes).
       5. Como último recurso, extraer el último monto significativo del ticket.
-    Se valida que el valor obtenido se encuentre en un rango lógico (por ejemplo, entre 10 y 10,000).
+    Se valida que el valor esté en un rango lógico (entre 10 y 10,000).
     """
     estrategias = [
-        # Estrategia 1 (Código 1): Buscar "TOTAL" (permitiendo errores OCR)
+        # Estrategia 1: Buscar "TOTAL" con posibles errores OCR.
         lambda: re.search(r'T[O0]T[A4]L[\s:$]*(\d{1,3}(?:[.,]\d{3})*[.,]\d{2})', texto),
-        # Estrategia 2 (Código 2): Buscar "TOTAL" con símbolo de moneda
+        # Estrategia 2: Buscar "TOTAL" seguido de símbolo de moneda.
         lambda: re.search(r'TOTAL\s*\$\s*(\d+\.\d{2})', texto),
-        # Estrategia 3 (Código 2): Buscar "MONTO:"
+        # Estrategia 3: Buscar "MONTO:".
         lambda: re.search(r'MONTO:\s*(\d+\.\d{2})', texto),
-        # Estrategia 4 (Código 1): Calcular a partir de EFECTIVO y CAMBIO (variante 1)
-        lambda: (lambda e, c: e - c if e and c else None)(
-                    re.search(r'EFECT[I1]V[O0][\D]*(\d+[.,]\d{2})', texto),
-                    re.search(r'CAMB[I1]O[\D]*(\d+[.,]\d{2})', texto)
-                ),
-        # Estrategia 5 (Código 2): Calcular a partir de EFECTIVO y CAMBIO (variante 2)
-        lambda: (lambda e, c: e - c if e and c else None)(
-                    re.search(r'EFECTIVO\s*(\d+\.\d{2})', texto),
-                    re.search(r'CAMBIO\s*(\d+\.\d{2})', texto)
-                ),
-        # Estrategia 6 (Código 1): Extraer el último monto significativo
-        lambda: (lambda m: float(m[-1].replace(',', '')) if m else None)(
-                    re.findall(r'\b\d{3,}(?:[.,]\d{3})*[.,]\d{2}\b', texto)
-                )
+        # Estrategia 4: Calcular a partir de EFECTIVO - CAMBIO (variante 1).
+        lambda: (
+            (lambda e, c: parse_number(e) - parse_number(c) if e and c else None)(
+                re.search(r'EFECT[I1]V[O0][^\d]*(\d+[.,]\d{2})', texto).group(1) if re.search(r'EFECT[I1]V[O0][^\d]*(\d+[.,]\d{2})', texto) else None,
+                re.search(r'CAMB[I1]O[^\d]*(\d+[.,]\d{2})', texto).group(1) if re.search(r'CAMB[I1]O[^\d]*(\d+[.,]\d{2})', texto) else None
+            )
+        ),
+        # Estrategia 5: Calcular a partir de EFECTIVO - CAMBIO (variante 2).
+        lambda: (
+            (lambda e, c: parse_number(e) - parse_number(c) if e and c else None)(
+                re.search(r'EFECTIVO\s*(\d+\.\d{2})', texto).group(1) if re.search(r'EFECTIVO\s*(\d+\.\d{2})', texto) else None,
+                re.search(r'CAMBIO\s*(\d+\.\d{2})', texto).group(1) if re.search(r'CAMBIO\s*(\d+\.\d{2})', texto) else None
+            )
+        ),
+        # Estrategia 6: Extraer el último monto significativo del ticket.
+        lambda: (lambda m: parse_number(m[-1]) if m else None)(
+            re.findall(r'\b\d{3,}(?:[.,]\d{3})*[.,]\d{2}\b', texto)
+        )
     ]
-    
+
     for estrategia in estrategias:
         try:
             resultado = estrategia()
             if resultado:
-                if isinstance(resultado, float):
+                # Si la estrategia devuelve un objeto match, extraemos el grupo y convertimos a número
+                if hasattr(resultado, "group"):
+                    valor = parse_number(resultado.group(1))
+                elif isinstance(resultado, (float, int)):
                     valor = resultado
                 else:
-                    valor = float(resultado.group(1).replace(',', ''))
+                    valor = resultado
+
                 if 10 < valor < 10000:
                     return round(valor, 2)
         except Exception:
@@ -140,10 +144,10 @@ def extraer_total(texto):
 def analizar_ticket(ruta_imagen):
     """
     Proceso completo de análisis del ticket:
-      1. Preprocesa la imagen y extrae el texto (combinando dos configuraciones OCR).
-      2. Detecta la tienda a partir de los patrones definidos.
-      3. Extrae el total mediante múltiples estrategias.
-      
+      1. Preprocesa la imagen y extrae el texto con EasyOCR.
+      2. Detecta la tienda mediante patrones definidos.
+      3. Extrae el total usando múltiples estrategias.
+    
     Devuelve un diccionario con la tienda, el total y el texto extraído (útil para depuración).
     """
     try:
@@ -153,22 +157,20 @@ def analizar_ticket(ruta_imagen):
         return {
             'tienda': tienda,
             'total': total,
-            'texto_ocr': texto  # Útil para depurar y ajustar patrones
+            'texto_ocr': texto  # Para depuración y ajustes en los patrones
         }
     except Exception as e:
         return {'error': str(e)}
-    
-    
+
 if __name__ == "__main__":
     try:
         if len(sys.argv) != 2:
             print(json.dumps({'error': 'Número inválido de argumentos'}))
             sys.exit(1)
-            
+
         ruta_imagen = sys.argv[1]
         resultados = analizar_ticket(ruta_imagen)
         print(json.dumps(resultados, ensure_ascii=False))
-        
     except Exception as e:
         print(json.dumps({
             'error': 'Error inesperado',
