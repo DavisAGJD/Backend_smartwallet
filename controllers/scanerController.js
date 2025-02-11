@@ -8,14 +8,21 @@ const processImage = (imagePath) => {
     const pythonScript = path.join(__dirname, "../scripts/scan_ticket.py");
 
     exec(`python "${pythonScript}" "${imagePath}"`, (error, stdout, stderr) => {
-      if (error) {
-        return reject(new Error(`Error en el script Python: ${stderr}`));
-      }
+      console.log("[OCR RAW OUTPUT]", stdout); // <- Log crucial
+
       try {
-        const result = JSON.parse(stdout);
+        const cleaned = stdout.replace(/'/g, '"').replace(/\\n/g, " ").trim();
+
+        const result = JSON.parse(cleaned);
+
+        if (!result.tienda || !result.total) {
+          console.error("Datos incompletos:", result);
+        }
+
         resolve(result);
-      } catch (parseError) {
-        reject(new Error("Error parseando la respuesta de Python"));
+      } catch (e) {
+        console.error("Error parseando JSON:", e.message);
+        reject(new Error(`Respuesta inválida: ${cleaned}`));
       }
     });
   });

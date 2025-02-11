@@ -8,6 +8,10 @@ import os
 pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 os.environ['TESSDATA_PREFIX'] = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'tessdata')
 
+# Verificar existencia del modelo de idioma
+if not os.path.exists(os.path.join(os.environ['TESSDATA_PREFIX'], 'spa.traineddata')):
+    raise Exception(f"Modelo español no encontrado en: {os.environ['TESSDATA_PREFIX']}")
+
 def procesar_imagen(ruta_imagen):
     """
     Preprocesa la imagen para optimizar la extracción de texto.
