@@ -4,6 +4,7 @@ import re
 import sys
 import json
 
+
 def procesar_imagen(ruta_imagen):
     """
     Preprocesa la imagen para optimizar la extracción de texto.
