@@ -4,9 +4,21 @@ import re
 import sys
 import json
 import os
+import requests
 
-pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'  # Ruta correcta en Render
-os.environ['TESSDATA_PREFIX'] = '/usr/share/tesseract-ocr/4.00/tessdata' 
+
+pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
+
+tessdata_url = "https://github.com/tesseract-ocr/tessdata/raw/main/spa.traineddata"
+response = requests.get(tessdata_url)
+with open("spa.traineddata", "wb") as f:
+    f.write(response.content)
+
+pytesseract.pytesseract.tesseract_args = [
+    '--tessdata-dir', '.',  # Usar directorio actual
+    '--psm', '4',
+    '--oem', '3'
+]
 
 # Verificar existencia del modelo de idioma
 if not os.path.exists(os.path.join(os.environ['TESSDATA_PREFIX'], 'spa.traineddata')):
