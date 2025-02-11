@@ -1,7 +1,8 @@
 const express = require("express");
 const app = express();
 require("dotenv").config();
-const fetch = (...args) => import("node-fetch").then(({ default: fetch }) => fetch(...args));
+const fetch = (...args) =>
+  import("node-fetch").then(({ default: fetch }) => fetch(...args));
 const cors = require("cors");
 require("./cronJobs");
 const port = process.env.PORT;
@@ -17,6 +18,7 @@ const recordatoriosRoutes = require("./routes/recordatoriosRoutes");
 const reportesRoutes = require("./routes/reportesRoutes");
 const ingresoRoutes = require("./routes/ingresoRoutes");
 const notificacionesRoutes = require("./routes/notificacionesRoutes");
+const scanerRoutes = require("./routes/scanRoutes");
 
 // Configuración de CORS
 app.use(
@@ -38,6 +40,7 @@ app.use("/api/recordatorios", recordatoriosRoutes);
 app.use("/api/reportes", reportesRoutes);
 app.use("/api/ingresos", ingresoRoutes);
 app.use("/api/notificaciones", notificacionesRoutes);
+app.use("/api/scaner", scanerRoutes);
 
 // Ruta para obtener artículos de NewsData.io
 app.get("/api/articles", async (req, res) => {
