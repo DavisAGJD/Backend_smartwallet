@@ -5,8 +5,8 @@ import sys
 import json
 import os
 
-pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
-os.environ['TESSDATA_PREFIX'] = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'tessdata')
+pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'  # Ruta correcta en Render
+os.environ['TESSDATA_PREFIX'] = '/usr/share/tesseract-ocr/4.00/tessdata' 
 
 # Verificar existencia del modelo de idioma
 if not os.path.exists(os.path.join(os.environ['TESSDATA_PREFIX'], 'spa.traineddata')):
