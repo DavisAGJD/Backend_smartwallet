@@ -6,7 +6,7 @@ import json
 import os
 
 pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
-os.environ['TESSDATA_PREFIX'] = os.path.join(os.getcwd(), 'tessdata')
+os.environ['TESSDATA_PREFIX'] = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'tessdata')
 
 def procesar_imagen(ruta_imagen):
     """
