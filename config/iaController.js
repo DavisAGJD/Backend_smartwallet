@@ -1,9 +1,3 @@
-const { pipeline, env } = require('@xenova/transformers').default; // Cambio crucial
-
-// Configuración esencial
-env.useBrowser = false;
-env.allowLocalModels = false;
-
 let nerPipeline;
 let isModelLoading = false;
 
@@ -11,35 +5,32 @@ const loadModel = async () => {
   if (!nerPipeline && !isModelLoading) {
     isModelLoading = true;
     try {
-      // Usar import dinámico para transformers
       const { pipeline } = await import('@xenova/transformers');
-      
       nerPipeline = await pipeline('ner', 'Xenova/distilbert-base-multilingual-cased', {
-        quantized: true,
-        revision: 'main'
+        quantized: true // Habilita cuantización
       });
-      
-      console.log("✅ Modelo cargado con éxito");
+      console.log("Modelo cargado");
     } catch (error) {
-      console.error("❌ Error crítico:", error);
-      process.exit(1);
-    } finally {
-      isModelLoading = false;
+      console.error("Error cargando modelo:", error);
     }
+    isModelLoading = false;
   }
 };
 
-// Middleware checkModel (sin cambios)
+// Llama a loadModel() al iniciar
+loadModel();
+
+// Middleware para verificar modelo
 const checkModel = async (req, res, next) => {
   if (!nerPipeline) {
-    try {
-      await loadModel();
-    } catch (error) {
-      return res.status(503).json({ error: 'Servicio temporalmente no disponible' });
+    await loadModel();
+    if (!nerPipeline) {
+      return res.status(503).json({ error: 'Modelo aún no disponible' });
     }
   }
   next();
 };
+
 
 const analyzeText = async (req, res) => {
   try {
@@ -78,6 +69,5 @@ const analyzeText = async (req, res) => {
 // Exportar la función
 module.exports = {
   analyzeText,
-  checkModel,
-  loadModel
+  checkModel
 };
