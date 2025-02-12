@@ -1,3 +1,9 @@
+const { pipeline, env } = require('@xenova/transformers'); // <- Cambio crucial aquí
+
+// Configuración esencial para Render
+env.useBrowser = false; // <- Obligatorio para entornos serverless
+env.remoteHost = 'https://huggingface.co'; // <- Fuerza conexión correcta
+
 let nerPipeline;
 let isModelLoading = false;
 
@@ -5,32 +11,44 @@ const loadModel = async () => {
   if (!nerPipeline && !isModelLoading) {
     isModelLoading = true;
     try {
-      const { pipeline } = await import('@xenova/transformers');
       nerPipeline = await pipeline('ner', 'Xenova/distilbert-base-multilingual-cased', {
-        quantized: true // Habilita cuantización
+        quantized: true,
+        revision: 'main', // <- Añadir esta línea
       });
-      console.log("Modelo cargado");
+      console.log("Modelo cargado correctamente");
+      
+      // Liberar memoria después de carga exitosa
+      if (global.gc) global.gc();
     } catch (error) {
-      console.error("Error cargando modelo:", error);
+      console.error("Error crítico cargando modelo:", error);
+      process.exit(1); // <- Detener la app si falla
+    } finally {
+      isModelLoading = false;
     }
-    isModelLoading = false;
   }
 };
 
-// Llama a loadModel() al iniciar
-loadModel();
-
-// Middleware para verificar modelo
+// Middleware modificado
 const checkModel = async (req, res, next) => {
   if (!nerPipeline) {
-    await loadModel();
-    if (!nerPipeline) {
-      return res.status(503).json({ error: 'Modelo aún no disponible' });
+    try {
+      await loadModel();
+    } catch (error) {
+      return res.status(503).json({ 
+        error: 'Servicio no disponible. Intente nuevamente en 30 segundos'
+      });
     }
   }
   next();
 };
 
+// En tu analyzeText, añade esto al final:
+res.json({ success: true, data: extractedInfo });
+
+// Liberar memoria después de responder
+if (global.gc) {
+  setTimeout(() => global.gc(), 5000); // GC diferido
+}
 
 const analyzeText = async (req, res) => {
   try {
