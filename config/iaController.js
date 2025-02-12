@@ -1,13 +1,14 @@
-let nerPipeline;
+import { pipeline } from '@xenova/transformers';
 
+// Cargar el modelo de Transformers (NER - Named Entity Recognition)
+let nerPipeline;
 (async () => {
-    const { pipeline } = await import('@xenova/transformers');
     nerPipeline = await pipeline('ner', 'Xenova/bert-base-multilingual-cased');
     console.log("Modelo de IA cargado correctamente");
 })();
 
 // Función para analizar el texto con IA
-const analyzeText = async (req, res) => {
+export const analyzeText = async (req, res) => {
     try {
         const { text } = req.body;
 
@@ -37,9 +38,4 @@ const analyzeText = async (req, res) => {
         console.error("Error al procesar el texto con IA:", error);
         res.status(500).json({ error: 'Error al procesar el texto' });
     }
-};
-
-// Exportar la función
-module.exports = {
-    analyzeText,
 };
