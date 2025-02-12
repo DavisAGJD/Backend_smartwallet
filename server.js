@@ -20,6 +20,9 @@ const ingresoRoutes = require("./routes/ingresoRoutes");
 const notificacionesRoutes = require("./routes/notificacionesRoutes");
 const scanerRoutes = require("./routes/scanRoutes");
 
+// Importa el controlador de IA
+const { analyzeText } = require("./controllers/iaController");
+
 // Configuración de CORS
 app.use(
   cors({
@@ -41,6 +44,9 @@ app.use("/api/reportes", reportesRoutes);
 app.use("/api/ingresos", ingresoRoutes);
 app.use("/api/notificaciones", notificacionesRoutes);
 app.use("/api/scaner", scanerRoutes);
+
+// Ruta para analizar texto con IA
+app.post("/api/analyze-text", analyzeText);
 
 // Ruta para obtener artículos de NewsData.io
 app.get("/api/articles", async (req, res) => {
