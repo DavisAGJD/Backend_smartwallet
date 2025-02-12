@@ -1,14 +1,12 @@
-import { pipeline } from '@xenova/transformers';
-
-// Cargar el modelo de Transformers (NER - Named Entity Recognition)
 let nerPipeline;
+
 (async () => {
+    const { pipeline } = await import('@xenova/transformers');
     nerPipeline = await pipeline('ner', 'Xenova/bert-base-multilingual-cased');
     console.log("Modelo de IA cargado correctamente");
 })();
 
-// Función para analizar el texto con IA
-export const analyzeText = async (req, res) => {
+const analyzeText = async (req, res) => {
     try {
         const { text } = req.body;
 
@@ -16,10 +14,12 @@ export const analyzeText = async (req, res) => {
             return res.status(400).json({ error: 'Texto no proporcionado' });
         }
 
-        // Procesar el texto con el modelo de Transformers
+        if (!nerPipeline) {
+            return res.status(500).json({ error: 'Modelo de IA no está listo aún' });
+        }
+
         const entities = await nerPipeline(text);
 
-        // Extraer información relevante (monto y categoría)
         const extractedInfo = {
             amount: null,
             category: null,
@@ -27,9 +27,9 @@ export const analyzeText = async (req, res) => {
 
         for (const entity of entities) {
             if (entity.entity === 'MISC' && !isNaN(parseFloat(entity.word))) {
-                extractedInfo.amount = entity.word; // Extraer montos
+                extractedInfo.amount = entity.word;
             } else if (entity.entity === 'ORG') {
-                extractedInfo.category = entity.word; // Extraer categorías
+                extractedInfo.category = entity.word;
             }
         }
 
@@ -38,4 +38,9 @@ export const analyzeText = async (req, res) => {
         console.error("Error al procesar el texto con IA:", error);
         res.status(500).json({ error: 'Error al procesar el texto' });
     }
+};
+
+// Exportar la función
+module.exports = {
+    analyzeText,
 };
