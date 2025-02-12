@@ -21,7 +21,7 @@ const notificacionesRoutes = require("./routes/notificacionesRoutes");
 const scanerRoutes = require("./routes/scanRoutes");
 
 // Importa el controlador de IA
-const { analyzeText } = require("./config/iaController");
+const { analyzeText, checkModel } = require("./config/iaController");
 
 // Configuración de CORS
 app.use(
@@ -46,7 +46,7 @@ app.use("/api/notificaciones", notificacionesRoutes);
 app.use("/api/scaner", scanerRoutes);
 
 // Ruta para analizar texto con IA
-app.post("/api/analyze-text", analyzeText);
+app.post("/api/analyze-text", checkModel, analyzeText);
 
 // Ruta para obtener artículos de NewsData.io
 app.get("/api/articles", async (req, res) => {
