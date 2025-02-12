@@ -1,8 +1,8 @@
-const { pipeline, env } = require('@xenova/transformers'); // <- Cambio crucial aquí
+const { pipeline, env } = require('@xenova/transformers').default; // Cambio crucial
 
-// Configuración esencial para Render
-env.useBrowser = false; // <- Obligatorio para entornos serverless
-env.remoteHost = 'https://huggingface.co'; // <- Fuerza conexión correcta
+// Configuración esencial
+env.useBrowser = false;
+env.allowLocalModels = false;
 
 let nerPipeline;
 let isModelLoading = false;
@@ -11,44 +11,35 @@ const loadModel = async () => {
   if (!nerPipeline && !isModelLoading) {
     isModelLoading = true;
     try {
+      // Usar import dinámico para transformers
+      const { pipeline } = await import('@xenova/transformers');
+      
       nerPipeline = await pipeline('ner', 'Xenova/distilbert-base-multilingual-cased', {
         quantized: true,
-        revision: 'main', // <- Añadir esta línea
+        revision: 'main'
       });
-      console.log("Modelo cargado correctamente");
       
-      // Liberar memoria después de carga exitosa
-      if (global.gc) global.gc();
+      console.log("✅ Modelo cargado con éxito");
     } catch (error) {
-      console.error("Error crítico cargando modelo:", error);
-      process.exit(1); // <- Detener la app si falla
+      console.error("❌ Error crítico:", error);
+      process.exit(1);
     } finally {
       isModelLoading = false;
     }
   }
 };
 
-// Middleware modificado
+// Middleware checkModel (sin cambios)
 const checkModel = async (req, res, next) => {
   if (!nerPipeline) {
     try {
       await loadModel();
     } catch (error) {
-      return res.status(503).json({ 
-        error: 'Servicio no disponible. Intente nuevamente en 30 segundos'
-      });
+      return res.status(503).json({ error: 'Servicio temporalmente no disponible' });
     }
   }
   next();
 };
-
-// En tu analyzeText, añade esto al final:
-res.json({ success: true, data: extractedInfo });
-
-// Liberar memoria después de responder
-if (global.gc) {
-  setTimeout(() => global.gc(), 5000); // GC diferido
-}
 
 const analyzeText = async (req, res) => {
   try {
@@ -87,5 +78,6 @@ const analyzeText = async (req, res) => {
 // Exportar la función
 module.exports = {
   analyzeText,
-  checkModel
+  checkModel,
+  loadModel
 };

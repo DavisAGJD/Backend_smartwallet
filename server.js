@@ -19,6 +19,8 @@ const reportesRoutes = require("./routes/reportesRoutes");
 const ingresoRoutes = require("./routes/ingresoRoutes");
 const notificacionesRoutes = require("./routes/notificacionesRoutes");
 const scanerRoutes = require("./routes/scanRoutes");
+require('./config/iaController').loadModel();
+
 
 // Importa el controlador de IA
 const { analyzeText, checkModel } = require("./config/iaController");
@@ -44,6 +46,8 @@ app.use("/api/reportes", reportesRoutes);
 app.use("/api/ingresos", ingresoRoutes);
 app.use("/api/notificaciones", notificacionesRoutes);
 app.use("/api/scaner", scanerRoutes);
+
+
 
 // Ruta para analizar texto con IA
 app.post("/api/analyze-text", checkModel, analyzeText);
