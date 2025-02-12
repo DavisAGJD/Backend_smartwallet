@@ -1,9 +1,17 @@
 let nerPipeline;
+let modelReady = false;
+let modelError = null;
 
 (async () => {
+  try {
     const { pipeline } = await import('@xenova/transformers');
     nerPipeline = await pipeline('ner', 'Xenova/bert-base-multilingual-cased');
-    console.log("Modelo de IA cargado correctamente");
+    modelReady = true;
+    console.log("Modelo cargado");
+  } catch (error) {
+    modelError = error;
+    console.error("Error cargando modelo:", error);
+  }
 })();
 
 const analyzeText = async (req, res) => {
