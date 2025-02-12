@@ -21,7 +21,7 @@ const notificacionesRoutes = require("./routes/notificacionesRoutes");
 const scanerRoutes = require("./routes/scanRoutes");
 
 // Importa el controlador de IA
-const { analyzeText } = require("./controllers/iaController");
+const { analyzeText } = require("./config/iaController");
 
 // Configuración de CORS
 app.use(
