@@ -1,3 +1,5 @@
+import os
+os.environ["TQDM_DISABLE"] = "1"
 import sys
 import json
 import logging

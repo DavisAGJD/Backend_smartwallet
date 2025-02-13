@@ -9,12 +9,12 @@ const processImage = (imagePath) => {
 
     exec(`python "${pythonScript}" "${imagePath}"`, (error, stdout, stderr) => {
       try {
-        // Separa la salida por líneas y filtra las que no sean de progreso
-        let lines = stdout
+        // Separamos la salida por líneas y filtramos las que NO sean de progreso
+        const lines = stdout
           .split("\n")
           .filter((line) => !line.startsWith("Progress:"));
-        // Suponiendo que la última línea es el JSON correcto
-        let cleaned = lines[lines.length - 1].trim();
+        // Suponemos que la última línea (o la que contenga el JSON) es la que queremos
+        const cleaned = lines[lines.length - 1].trim();
         const result = JSON.parse(cleaned);
         resolve(result);
       } catch (e) {
