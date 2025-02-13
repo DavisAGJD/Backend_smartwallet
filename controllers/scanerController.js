@@ -8,16 +8,18 @@ const processImage = (imagePath) => {
     const pythonScript = path.join(__dirname, "../scripts/scan_ticket.py");
 
     exec(`python "${pythonScript}" "${imagePath}"`, (error, stdout, stderr) => {
-      let cleaned = ""; // <--- Declarar fuera del try
       try {
-        console.log("[OCR RAW OUTPUT]", stdout);
-        cleaned = stdout.replace(/'/g, '"').replace(/\\n/g, " ").trim();
-
+        // Separa la salida por líneas y filtra las que no sean de progreso
+        let lines = stdout
+          .split("\n")
+          .filter((line) => !line.startsWith("Progress:"));
+        // Suponiendo que la última línea es el JSON correcto
+        let cleaned = lines[lines.length - 1].trim();
         const result = JSON.parse(cleaned);
         resolve(result);
       } catch (e) {
         console.error("Error parseando JSON:", e.message);
-        reject(new Error(`Respuesta inválida: ${cleaned}`)); // Ahora cleaned está definida
+        reject(new Error(`Respuesta inválida: ${stdout}`));
       }
     });
   });

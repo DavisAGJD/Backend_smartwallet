@@ -3,15 +3,15 @@ import json
 import logging
 import re
 from typing import Optional, Dict, Union
-
 import numpy as np
 from PIL import Image, ImageEnhance
 import easyocr
 import cv2
 from rapidfuzz import fuzz  # Para fuzzy matching
-
 # Integración de PyTorch para detectar la GPU
 import torch
+logging.basicConfig(stream=sys.stderr, level=logging.INFO)
+
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
