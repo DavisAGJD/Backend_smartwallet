@@ -8,13 +8,19 @@ const processImage = (imagePath) => {
     const pythonScript = path.join(__dirname, "../scripts/scan_ticket.py");
 
     exec(`python "${pythonScript}" "${imagePath}"`, (error, stdout, stderr) => {
+      if (error) {
+        return reject(new Error(`Error en el script Python: ${error.message}`));
+      }
       try {
-        // Separamos la salida por líneas y filtramos las que NO sean de progreso
         const lines = stdout
           .split("\n")
           .filter((line) => !line.startsWith("Progress:"));
-        // Suponemos que la última línea (o la que contenga el JSON) es la que queremos
-        const cleaned = lines[lines.length - 1].trim();
+        const cleaned = lines.join("").trim();
+        if (!cleaned) {
+          return reject(
+            new Error("No se recibió respuesta del script Python.")
+          );
+        }
         const result = JSON.parse(cleaned);
         resolve(result);
       } catch (e) {
@@ -86,14 +92,19 @@ const postGastoFromScan = async (req, res) => {
     console.error("Error en el controlador:", error);
     res.status(500).json({ error: error.message });
   } finally {
-    // Eliminar la imagen siempre que se haya definido la ruta
     if (imagePath) {
-      fs.unlink(imagePath, (err) => {
+      fs.access(imagePath, fs.constants.F_OK, (err) => {
         if (err) {
-          console.error(`Error eliminando imagen: ${err}`);
-        } else {
-          console.log("Imagen eliminada correctamente");
+          console.error(`La imagen no existe: ${imagePath}`);
+          return;
         }
+        fs.unlink(imagePath, (err) => {
+          if (err) {
+            console.error(`Error eliminando imagen: ${err}`);
+          } else {
+            console.log("Imagen eliminada correctamente");
+          }
+        });
       });
     }
   }
