@@ -12,12 +12,23 @@ import cv2
 from rapidfuzz import fuzz  # Para fuzzy matching
 # Integración de PyTorch para detectar la GPU
 import torch
+
+def suppress_logs():
+    import warnings
+    warnings.filterwarnings("ignore")
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suprime logs de TensorFlow
+    from easyocr.utils import get_logger
+    easyocr_logger = get_logger()
+    easyocr_logger.setLevel(logging.ERROR)
+
+suppress_logs()
+
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 
 
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)  # Cambiar de INFO a WARNING
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 # Detectar si hay GPU disponible mediante PyTorch
 gpu_disponible = torch.cuda.is_available()
@@ -30,8 +41,12 @@ else:
 BATCH_SIZE = 16 if gpu_disponible else 4
 
 # Inicializar EasyOCR para español usando GPU (si está disponible)
-reader = easyocr.Reader(['es'], gpu=gpu_disponible)
-
+reader = easyocr.Reader(
+    ['es'], 
+    gpu=gpu_disponible, 
+    verbose=False,  # <-- Añadir este parámetro
+    recognizer=False  # Mejora rendimiento si solo necesitas detección
+)
 
 def normalizar_texto(texto: str) -> str:
     """Normaliza el texto: elimina espacios extra y lo pasa a mayúsculas."""
@@ -124,7 +139,12 @@ def procesar_imagen_pil(ruta_imagen: str) -> str:
             paragraph=True,
             detail=0,
             batch_size=BATCH_SIZE,
-            allowlist='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÜÑ$€., '
+            allowlist='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÜÑ$€., ',
+            paragraph=True,
+            detail=0,
+            batch_size=BATCH_SIZE,
+            allowlist='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÜÑ$€., ',
+            verbose=False 
         )
         return normalizar_texto(' '.join(resultados))
     except Exception as e:
@@ -322,7 +342,7 @@ def analizar_ticket(ruta_imagen: str) -> Dict[str, Union[str, float]]:
     """
     try:
         texto = procesar_imagen_mejorado(ruta_imagen)
-        logger.info(f"Texto OCR procesado:\n{texto}")
+        logger.debug(f"Texto OCR procesado:\n{texto[:200]}")  # Limitar a 200 caracteres
         tienda = detectar_tienda(texto)
         total = extraer_total_estrategias(texto)
         # Si la detección falla, se intenta un OCR directo como respaldo.
@@ -338,7 +358,7 @@ def analizar_ticket(ruta_imagen: str) -> Dict[str, Union[str, float]]:
         return {
             'tienda': tienda,
             'total': total,
-            'texto_ocr': texto
+            'texto_ocr': texto[:500]  # Limitar texto para payloads grandes
         }
     except Exception as e:
         logger.error(f"Error en el análisis del ticket: {str(e)}")

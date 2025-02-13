@@ -7,27 +7,33 @@ const processImage = (imagePath) => {
   return new Promise((resolve, reject) => {
     const pythonScript = path.join(__dirname, "../scripts/scan_ticket.py");
 
-    exec(`python "${pythonScript}" "${imagePath}"`, (error, stdout, stderr) => {
-      if (error) {
-        return reject(new Error(`Error en el script Python: ${error.message}`));
-      }
-      try {
-        const lines = stdout
-          .split("\n")
-          .filter((line) => !line.startsWith("Progress:"));
-        const cleaned = lines.join("").trim();
-        if (!cleaned) {
+    exec(
+      `python "${pythonScript}" "${imagePath}"`,
+      { maxBuffer: 5 * 1024 * 1024, encoding: "utf-8" },
+      (error, stdout, stderr) => {
+        if (error) {
           return reject(
-            new Error("No se recibió respuesta del script Python.")
+            new Error(`Error en el script Python: ${error.message}`)
           );
         }
-        const result = JSON.parse(cleaned);
-        resolve(result);
-      } catch (e) {
-        console.error("Error parseando JSON:", e.message);
-        reject(new Error(`Respuesta inválida: ${stdout}`));
+        try {
+          const lines = stdout
+            .split("\n")
+            .filter((line) => !line.startsWith("Progress:"));
+          const cleaned = lines.join("").trim();
+          if (!cleaned) {
+            return reject(
+              new Error("No se recibió respuesta del script Python.")
+            );
+          }
+          const result = JSON.parse(cleaned);
+          resolve(result);
+        } catch (e) {
+          console.error("Error parseando JSON:", e.message);
+          reject(new Error(`Respuesta inválida: ${stdout}`));
+        }
       }
-    });
+    );
   });
 };
 
