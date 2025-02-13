@@ -64,7 +64,6 @@ app.get("/api/articles", async (req, res) => {
     }
 
     const data = await response.json();
-    console.log("Artículos recibidos de NewsData.io:", data.results); // Log de los resultados
     res.json(data.results); // Envía los artículos al frontend
   } catch (error) {
     console.error("Error en la solicitud a NewsData.io:", error);
