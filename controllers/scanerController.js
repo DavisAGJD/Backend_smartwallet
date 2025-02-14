@@ -2,12 +2,16 @@
 const fs = require("fs");
 const Gasto = require("../models/gastos");
 const { analyzeTicket } = require("../scripts/ticketProcessor"); // Ajusta la ruta según tu estructura
+const { v4: uuidv4 } = require("uuid");
+const pendingTransactions = new Map();
 
 const postGastoFromScan = async (req, res) => {
-  let imagePath; // Se declara aquí para usarla en el bloque finally
+  let imagePath;
+  let transactionStored = false;
+
   try {
-    // 1. Verificar autenticación y obtener usuario_id
-    const usuario_id = req.userId; // Suponiendo que tienes un middleware de autenticación
+    // 1. Verificar autenticación
+    const usuario_id = req.userId;
 
     // 2. Procesar imagen
     if (!req.file) {
@@ -24,62 +28,106 @@ const postGastoFromScan = async (req, res) => {
       });
     }
 
-    // 4. Crear objeto gasto con la estructura requerida
+    // 4. Crear objeto gasto temporal
     const nuevoGasto = {
       monto: scanResult.total,
-      categoria_gasto_id: 11, // ID fijo para supermercados
+      categoria_gasto_id: 11,
       descripcion: `Compra en ${scanResult.tienda}`,
     };
 
-    // 5. Llamar al modelo para crear el gasto y actualizar puntos
-    await new Promise((resolve, reject) => {
-      Gasto.create(usuario_id, nuevoGasto, (err, data) => {
-        if (err) {
-          return reject(new Error("Error al crear gasto"));
-        }
-        // 6. Actualizar puntos
-        const puntos = 10;
-        Gasto.agregarPuntos(usuario_id, puntos, (err, result) => {
-          if (err) {
-            return reject(new Error("Error al actualizar los puntos"));
-          }
-          // 7. Responder combinando la información
-          res.status(201).json({
-            message:
-              "Gasto añadido exitosamente y puntos actualizados",
-            data: {
-              ...data,
-              detalles_scan: {
-                tienda: scanResult.tienda,
-                total_escaneado: scanResult.total,
-              },
-            },
-            puntos,
-          });
-          resolve();
-        });
-      });
+    // 5. Generar ID de transacción y almacenar temporalmente
+    const transactionId = uuidv4();
+    pendingTransactions.set(transactionId, {
+      usuario_id,
+      nuevoGasto,
+      imagePath,
+      scanResult,
+    });
+    transactionStored = true;
+
+    // 6. Responder con datos para confirmación
+    res.status(200).json({
+      message: "Confirma el gasto",
+      data: {
+        detalles_scan: {
+          tienda: scanResult.tienda,
+          total_escaneado: scanResult.total,
+        },
+        transactionId,
+      },
     });
   } catch (error) {
     console.error("Error en el controlador:", error.message);
     res.status(500).json({ error: error.message });
   } finally {
-    if (imagePath) {
-      fs.access(imagePath, fs.constants.F_OK, (err) => {
-        if (err) {
-          console.error(`La imagen no existe: ${imagePath}`);
-          return;
-        }
-        fs.unlink(imagePath, (err) => {
-          if (err) {
-            console.error(`Error eliminando imagen: ${err}`);
-          } else {
-            console.log("Imagen eliminada correctamente");
-          }
-        });
+    // Eliminar imagen solo si no se almacenó la transacción
+    if (!transactionStored && imagePath) {
+      fs.unlink(imagePath, (err) => {
+        if (err) console.error(`Error eliminando imagen: ${err}`);
       });
     }
   }
 };
 
-module.exports = { postGastoFromScan };
+const confirmGasto = async (req, res) => {
+  const { transactionId, confirm } = req.body;
+  let transaction; // Declarar la variable fuera del try
+
+  try {
+    transaction = pendingTransactions.get(transactionId);
+    if (!transaction) {
+      return res
+        .status(404)
+        .json({ error: "Transacción no válida o expirada" });
+    }
+
+    const { usuario_id, nuevoGasto, imagePath, scanResult } = transaction;
+
+    if (confirm) {
+      // 1. Crear gasto en BD
+      const gastoData = await new Promise((resolve, reject) => {
+        Gasto.create(usuario_id, nuevoGasto, (err, data) => {
+          if (err) reject(new Error("Error al crear gasto"));
+          resolve(data);
+        });
+      });
+
+      // 2. Actualizar puntos
+      await new Promise((resolve, reject) => {
+        Gasto.agregarPuntos(usuario_id, 10, (err, result) => {
+          if (err) reject(new Error("Error al actualizar puntos"));
+          resolve();
+        });
+      });
+
+      res.status(201).json({
+        message: "Gasto confirmado exitosamente",
+        data: {
+          ...gastoData,
+          detalles_scan: {
+            tienda: scanResult.tienda,
+            total_escaneado: scanResult.total,
+          },
+        },
+        puntos: 10,
+      });
+    } else {
+      res.status(200).json({ message: "Gasto cancelado" });
+    }
+  } catch (error) {
+    console.error("Error en confirmación:", error.message);
+    res.status(500).json({ error: error.message });
+  } finally {
+    // Limpieza siempre
+    if (transaction) {
+      pendingTransactions.delete(transactionId);
+      if (transaction.imagePath) {
+        fs.unlink(transaction.imagePath, (err) => {
+          if (err) console.error("Error eliminando imagen:", err);
+        });
+      }
+    }
+  }
+};
+
+module.exports = { postGastoFromScan, confirmGasto };
