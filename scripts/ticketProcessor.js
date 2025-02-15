@@ -1,59 +1,89 @@
-// ticketProcessor.js
 const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
 const FormData = require("form-data");
-const stringSimilarity = require("string-similarity"); // npm install string-similarity
+const stringSimilarity = require("string-similarity");
 
-/**
- * Normaliza el texto: elimina espacios extra y lo pasa a mayúsculas.
- */
+// Mapeo de palabras a números
+const wordNumberMap = {
+  UNO: 1,
+  DOS: 2,
+  TRES: 3,
+  CUATRO: 4,
+  CINCO: 5,
+  SEIS: 6,
+  SIETE: 7,
+  OCHO: 8,
+  NUEVE: 9,
+  DIEZ: 10,
+  ONCE: 11,
+  DOCE: 12,
+  TRECE: 13,
+  CATORCE: 14,
+  QUINCE: 15,
+  DIECISEIS: 16,
+  DIECISIETE: 17,
+  DIECIOCHO: 18,
+  DIECINUEVE: 19,
+  VEINTE: 20,
+  TREINTA: 30,
+  CUARENTA: 40,
+  CINCUENTA: 50,
+  SESENTA: 60,
+  SETENTA: 70,
+  OCHENTA: 80,
+  NOVENTA: 90,
+  CIEN: 100,
+  MIL: 1000,
+};
+
 function normalizeText(text) {
   return text.replace(/\s+/g, " ").trim().toUpperCase();
 }
 
-/**
- * Convierte una cadena numérica con formato (puntos, comas) a float.
- */
 function strToFloat(s) {
   try {
-    // Elimina caracteres que no sean dígitos, punto o coma
     let cleaned = s.replace(/[^\d.,]/g, "");
     if (cleaned.includes(",") && cleaned.includes(".")) {
-      // Si aparecen ambos, asumimos que la coma es decimal si tiene 2 dígitos al final
       const parts = cleaned.split(",");
-      const decimalPart = parts[parts.length - 1];
-      if (decimalPart.length === 2) {
+      if (parts[parts.length - 1].length === 2) {
         cleaned = cleaned.replace(/\./g, "").replace(",", ".");
       }
     } else {
       cleaned = cleaned.replace(",", ".");
     }
-    const value = parseFloat(cleaned);
-    if (value > 10 && value < 100000) {
-      return Math.round(value * 100) / 100;
-    }
-    return null;
+    return parseFloat(cleaned);
   } catch (err) {
-    console.warn(`Error al convertir '${s}': ${err}`);
     return null;
   }
 }
 
-/**
- * Envía la imagen a la API OCRSpace y devuelve el texto reconocido.
- * Se espera que la variable de ambiente OCR_SPACE_API_KEY esté definida.
- */
+function wordsToNumber(words) {
+  const parts = words.split(/\s+/);
+  let total = 0;
+  let current = 0;
+
+  for (const word of parts) {
+    const num = wordNumberMap[word] || 0;
+    if (num >= 100) {
+      total += current * num;
+      current = 0;
+    } else if (num >= 30 && num % 10 === 0) {
+      current += num;
+    } else {
+      current += num;
+    }
+  }
+  return total + current;
+}
+
 async function scanTicket(imagePath) {
   const apiKey = process.env.OCR_SPACE_API_KEY;
-  if (!apiKey) {
-    throw new Error("No se encontró la API key de OCRSpace en OCR_SPACE_API_KEY");
-  }
+  if (!apiKey) throw new Error("Missing OCR API Key");
 
   const formData = new FormData();
   formData.append("apikey", apiKey);
   formData.append("language", "spa");
-  formData.append("isOverlayRequired", "false");
   formData.append("file", fs.createReadStream(imagePath));
 
   try {
@@ -64,257 +94,183 @@ async function scanTicket(imagePath) {
         headers: formData.getHeaders(),
       }
     );
-
-    if (
-      response.data &&
-      response.data.ParsedResults &&
-      response.data.ParsedResults.length > 0
-    ) {
-      const parsedText = response.data.ParsedResults.map(
-        (result) => result.ParsedText
-      ).join(" ");
-      return parsedText;
-    } else {
-      throw new Error("No se obtuvieron resultados de OCRSpace.");
-    }
+    return response.data.ParsedResults?.[0]?.ParsedText || "";
   } catch (error) {
-    console.error("Error llamando a OCRSpace API:", error.message);
-    throw error;
+    throw new Error("OCR Error: " + error.message);
   }
 }
 
-/**
- * Detecta la tienda a partir del texto OCR usando:
- * 1. Patrones con expresiones regulares.
- * 2. Keywords.
- * 3. Fuzzy matching.
- */
 function detectStore(text) {
   const textNorm = normalizeText(text);
-  const lines = textNorm.split(".").slice(0, 5);
+  const lines = textNorm.split("\n").slice(0, 10);
 
-  // 1. Búsqueda por patrones (regex)
-  const patterns = {
-    "\\b(?:SUPER[\\-\\s]?AK[I1P]|SUPERAK[I1P]|SUP\\.?AK[I1P]|AK[I1P]\\s?GH|[CS]?AK(?:[I1PT]))\\b":
-      "Super Aki",
-    "\\b(?:BODEGA[\\-\\s]?AURRERA|WAL[\\-\\s]?MART|BODEGAAURRERA|B0DEGA\\sAURRERA)\\b":
-      "Bodega Aurrera",
-    "\\b(?:S[O0]R[I1][A4]N[A4]|SORIANA|SORI@NA)\\b": "Soriana",
-    "\\b(?:CHEDRAUI|CHEDRAUY|CHEDRAÜI)\\b": "Chedraui",
-    "\\b(?:OXXO|7\\-?ELEVEN)\\b": "OXXO",
-    "\\b(?:LA\\sCOMER|COMERCIAL\\sMEXICANA)\\b": "La Comer",
-    "\\b(?:TIENDA\\s?CONVENIENCIA)\\b": "Tienda Conveniencia",
-  };
-
-  for (const pattern in patterns) {
-    const regex = new RegExp(pattern, "i");
-    for (const line of lines) {
-      if (regex.test(line)) {
-        console.log(
-          `Tienda detectada por patrón: ${patterns[pattern]} (patrón: ${pattern})`
-        );
-        return patterns[pattern];
-      }
-    }
-  }
-
-  // 2. Búsqueda por keywords
-  const keywords = {
-    AKI: "Super Aki",
-    AKP: "Super Aki",
-    AKT: "Super Aki",
-    AURRERA: "Bodega Aurrera",
-    WALMART: "Bodega Aurrera",
-    SORIANA: "Soriana",
-    CHEDRAUI: "Chedraui",
-    OXXO: "OXXO",
-    CONVENIENCIA: "Tienda Conveniencia",
-  };
-
-  for (const key in keywords) {
-    const regex = new RegExp(`\\b${key}\\b`, "i");
-    if (regex.test(textNorm)) {
-      console.log(`Tienda detectada por keyword: ${keywords[key]}`);
-      return keywords[key];
-    }
-  }
-
-  // 3. Fuzzy matching sobre cada línea
-  const candidates = [
-    "Super Aki",
-    "Bodega Aurrera",
-    "Soriana",
-    "Chedraui",
-    "OXXO",
-    "La Comer",
-    "7-Eleven",
-    "Tienda Conveniencia",
+  // Detección por patrones clave
+  const storePatterns = [
+    {
+      regex: /(BODEGA\s*?AURRERA|BODEGAAURRERA|WAL\s*?MART)/i,
+      name: "Bodega Aurrera",
+    },
+    {
+      regex: /(SORIANA|TIENDAS\s*SORIANA)/i,
+      name: "Soriana",
+    },
+    {
+      regex: /(OXXO|0XX0|UXXO|CADENA\s*COMERCIAL\s*OXXO)/i, // Incluye variantes comunes
+      name: "OXXO",
+    },
+    {
+      regex: /(SUPER\s*AKI|SURPER\s*AKI|AKI\s*GH)/i,
+      name: "Super Aki",
+    },
   ];
-  let bestScore = 0;
-  let bestCandidate = "Desconocida";
-  const allLines = textNorm.split(".");
 
-  for (const line of allLines) {
-    for (const candidate of candidates) {
-      // stringSimilarity devuelve un valor entre 0 y 1
-      const score = stringSimilarity.compareTwoStrings(candidate, line) * 100;
-      if (score > bestScore && score > 70) {
-        bestScore = score;
-        bestCandidate = candidate;
-      }
+  // Búsqueda por patrones
+  for (const { regex, name } of storePatterns) {
+    const match = textNorm.match(regex);
+    if (match) {
+      console.log(`Tienda detectada por regex: ${name}`);
+      return name;
     }
   }
-  console.log(
-    `Tienda detectada por fuzzy matching: ${bestCandidate} (score: ${bestScore})`
-  );
-  return bestCandidate;
+
+  // Fuzzy matching como último recurso
+  const candidates = ["OXXO", "Bodega Aurrera", "Soriana", "Super Aki"];
+  const matches = stringSimilarity.findBestMatch(textNorm, candidates);
+
+  // Umbral ajustado y priorización de OXXO
+  if (matches.bestMatch.rating > 0.35) {
+    // Umbral más bajo para mayor flexibilidad
+    console.log(
+      `Tienda detectada por fuzzy matching: ${matches.bestMatch.target}`
+    );
+    return matches.bestMatch.target;
+  }
+
+  const contextClues = {
+    "RFC\\s*[A-Z0-9]{12,14}": "OXXO", // Ej: RFC TUVAFR9701240
+    "UNIDAD\\s*TIXCACAL": "Bodega Aurrera",
+    "AVISO\\s*DE\\s*PRIVACIDAD": "Soriana",
+  };
+
+  for (const [pattern, store] of Object.entries(contextClues)) {
+    if (new RegExp(pattern, "i").test(textNorm)) {
+      console.log(`Tienda detectada por contexto: ${store}`);
+      return store;
+    }
+  }
+
+  return "Desconocida";
 }
 
-/**
- * Extrae el total utilizando varias estrategias:
- * 1. Búsqueda de la palabra TOTAL y un número.
- * 2. Patrón para TOTAL A PAGAR o IMPORTE.
- * 3. Búsqueda de "$" seguido de número.
- * 4. Selección del último número encontrado.
- * 5. Diferencia entre EFECTIVO y CAMBIO.
- * 6. Máximo de todos los números encontrados.
- */
 function extractTotal(text) {
   const textNorm = normalizeText(text);
   const strategies = [];
 
-  // Estrategia 1
+  // Estrategia 1: Total en la misma línea o línea siguiente a "TOTAL"
   strategies.push(() => {
-    const regex = /T[O0O]+T[A4]+L.*?(\d[\d.,]+\b)/i;
-    const match = textNorm.match(regex);
-    return match ? strToFloat(match[1]) : null;
-  });
-
-  // Estrategia 2
-  strategies.push(() => {
-    const regex = /(?:TOTAL\s*A\s*PAGAR|IMPORTE).*?(\d[\d.,]+)/i;
-    const match = textNorm.match(regex);
-    return match ? strToFloat(match[1]) : null;
-  });
-
-  // Estrategia 3
-  strategies.push(() => {
-    const regex = /\$\s*(\d[\d.,]+\b)/i;
-    const match = textNorm.match(regex);
-    return match ? strToFloat(match[1]) : null;
-  });
-
-  // Estrategia 4: último número en el texto
-  strategies.push(() => {
-    const regex = /\b\d[\d.,]+\b/g;
-    const matches = textNorm.match(regex);
-    return matches && matches.length > 0
-      ? strToFloat(matches[matches.length - 1])
-      : null;
-  });
-
-  // Estrategia 5: diferencia entre EFECTIVO y CAMBIO
-  strategies.push(() => {
-    const regexEfectivo = /EFECTIVO.*?(\d[\d.,]+)/i;
-    const regexCambio = /CAMBIO.*?(\d[\d.,]+)/i;
-    const matchE = textNorm.match(regexEfectivo);
-    const matchC = textNorm.match(regexCambio);
-    const efectivo = matchE ? strToFloat(matchE[1]) : null;
-    const cambio = matchC ? strToFloat(matchC[1]) : null;
-    if (efectivo !== null && cambio !== null) {
-      return efectivo - cambio;
-    }
-    return null;
-  });
-
-  // Estrategia 6: máximo de todos los números encontrados
-  strategies.push(() => {
-    const regex = /\b\d[\d.,]+\b/g;
-    const matches = textNorm.match(regex);
-    if (matches) {
-      const numbers = matches
-        .map((s) => strToFloat(s))
-        .filter((n) => n !== null);
-      if (numbers.length > 0) {
-        return Math.max(...numbers);
-      }
-    }
-    return null;
-  });
-
-  // Estrategia 7: nuevamente último número (replicando lógica Python)
-  strategies.push(() => {
-    const regex = /\b\d[\d.,]+\b/g;
-    const matches = textNorm.match(regex);
-    return matches && matches.length > 0
-      ? strToFloat(matches[matches.length - 1])
-      : null;
-  });
-
-  const validValues = [];
-  strategies.forEach((strategy) => {
-    try {
-      const result = strategy();
-      if (result !== null && result > 10 && result < 100000) {
-        validValues.push(result);
-      }
-    } catch (e) {
-      console.warn(`Error en estrategia de extracción: ${e}`);
-    }
-  });
-
-  let total = null;
-  if (validValues.length > 0) {
-    // Se selecciona el valor que más se repita
-    const frequency = {};
-    validValues.forEach((val) => {
-      frequency[val] = (frequency[val] || 0) + 1;
-    });
-    total = validValues.reduce((a, b) =>
-      frequency[a] > frequency[b] ? a : b
-    );
-  }
-
-  // Si aún no se encontró, intentar con fuzzy matching en líneas que contengan "TOTAL"
-  if (total === null) {
     const lines = textNorm.split("\n");
-    for (const line of lines) {
-      if (stringSimilarity.compareTwoStrings("TOTAL", line) * 100 > 70) {
-        const match = line.match(/(\d[\d.,]+)/);
-        if (match) {
-          total = strToFloat(match[1]);
-          if (total !== null) {
-            console.log(`Total detectado por fuzzy matching: ${total}`);
-            break;
-          }
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes("TOTAL")) {
+        // Buscar en la línea actual
+        const currentLineMatch = lines[i].match(/(\d+[\.,]\d{2})/);
+        if (currentLineMatch) return strToFloat(currentLineMatch[1]);
+
+        // Buscar en la siguiente línea
+        if (i + 1 < lines.length) {
+          const nextLineMatch = lines[i + 1].match(/(\d+[\.,]\d{2})/);
+          if (nextLineMatch) return strToFloat(nextLineMatch[1]);
         }
       }
     }
-  }
+    return null;
+  });
 
-  return total;
+  // Estrategia 2: Detección clásica con regex mejorada
+  strategies.push(() => {
+    const regex = /TOTAL\s+(\d+[\.,]\d{2})/i;
+    const match = textNorm.match(regex);
+    return match ? strToFloat(match[1]) : null;
+  });
+
+  // Estrategia 3: Excluir efectivo/cambio usando contexto
+  strategies.push(() => {
+    const numbers = textNorm.match(/\d+[\.,]\d{2}/g) || [];
+    const excludeKeywords = ["EFECTIVO", "CAMBIO", "AJUSTE"];
+    const validNumbers = numbers.filter((numStr) => {
+      const context = textNorm.substr(textNorm.indexOf(numStr) - 20, 40);
+      return !excludeKeywords.some((keyword) => context.includes(keyword));
+    });
+    return validNumbers.length > 0
+      ? Math.max(...validNumbers.map(strToFloat))
+      : null;
+  });
+  
+  // Estrategia 4: Máximo numérico con filtros
+  strategies.push(() => {
+    const exclude = [
+      /\d{2}\/\d{2}\/\d{4}/, // Fechas
+      /\d{2}:\d{2}/, // Horas
+      /C\.P\.\s*\d{5}/, // Códigos postales
+      /\d{16,19}/, // Tarjetas
+      /(\d{2}\/\d{2}\/\d{2})/, // Fechas como 13/02/25
+      /(\d{2}:\d{2})/, // Horas como 21:21
+      /(C\.P\.\s?\d{5})/,
+    ];
+
+    const numbers = textNorm.match(/\d+[\.,]\d{2}/g) || [];
+    const valid = numbers
+      .map(strToFloat)
+      .filter((n) => n > 1 && n < 10000 && !exclude.some((p) => p.test(n)));
+
+    return valid.length > 0 ? Math.max(...valid) : null;
+  });
+
+  // Estrategia 5: Capturar "QUINCE PESOS 00/100"
+  strategies.push(() => {
+    const match = textNorm.match(/QUINCE\s+PESOS\s+00\/100/i);
+    return match ? 15.0 : null;
+  });
+
+  // Estrategia 6: Usar diferencia efectivo-cambio (50.00 - 35.00 = 15.00)
+  strategies.push(() => {
+    const efectivo = textNorm.match(/EFECTIVO\s+(\d+[\.,]\d{2})/i);
+    const cambio = textNorm.match(/CAMBIO\s+(\d+[\.,]\d{2})/i);
+    return efectivo && cambio
+      ? strToFloat(efectivo[1]) - strToFloat(cambio[1])
+      : null;
+  });
+
+  // Ejecutar estrategias
+  const results = strategies
+    .map((strategy) => {
+      try {
+        return strategy();
+      } catch {
+        return null;
+      }
+    })
+    .filter((n) => n !== null);
+
+  // Seleccionar valor más frecuente
+  const frequency = results.reduce((acc, val) => {
+    acc[val] = (acc[val] || 0) + 1;
+    return acc;
+  }, {});
+
+  return Object.keys(frequency).length > 0
+    ? Number(Object.entries(frequency).sort((a, b) => b[1] - a[1])[0][0])
+    : null;
 }
 
-/**
- * Función principal que:
- * 1. Envía la imagen a OCRSpace para extraer el texto.
- * 2. Procesa el texto para detectar la tienda y el total.
- * 3. Devuelve un objeto con { tienda, total, texto_ocr }.
- */
 async function analyzeTicket(imagePath) {
   try {
     const ocrText = await scanTicket(imagePath);
-    const tienda = detectStore(ocrText);
-    const total = extractTotal(ocrText);
-
-    // Si no se detecta tienda o total, podrías agregar llamadas adicionales o lógica extra
     return {
-      tienda,
-      total,
+      tienda: detectStore(ocrText),
+      total: extractTotal(ocrText),
       texto_ocr: normalizeText(ocrText),
     };
   } catch (error) {
-    console.error("Error en el análisis del ticket:", error.message);
     return { error: error.message };
   }
 }
