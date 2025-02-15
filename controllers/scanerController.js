@@ -5,8 +5,6 @@ const { analyzeTicket } = require("../scripts/ticketProcessor"); // Ajusta la ru
 const { v4: uuidv4 } = require("uuid");
 const pendingTransactions = new Map();
 
-// Función para registrar errores en el log
-const path = require("path");
 function logError(message, error = null) {
   const timeStamp = new Date().toISOString();
   console.error(`[${timeStamp}] ERROR: ${message}`);
