@@ -7,14 +7,15 @@ const pendingTransactions = new Map();
 
 // Función para registrar errores en el log
 const path = require("path");
-function logError(message) {
-  const logFilePath = path.join(__dirname, "../logs/error.log");
+function logError(message, error = null) {
   const timeStamp = new Date().toISOString();
-  const logMessage = `[${timeStamp}] ${message}\n`;
-  fs.appendFile(logFilePath, logMessage, (err) => {
-    if (err) console.error("Error escribiendo en el log:", err);
-  });
+  console.error(`[${timeStamp}] ERROR: ${message}`);
+  
+  if (error) {
+    console.error("Detalles del error:", error);
+  }
 }
+
 
 const postGastoFromScan = async (req, res) => {
   let imagePath;
