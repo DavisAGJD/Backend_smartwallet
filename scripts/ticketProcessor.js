@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
 const FormData = require("form-data");
+const sharp = require("sharp");
 const stringSimilarity = require("string-similarity");
 
 // Mapeo de palabras a números
@@ -81,10 +82,18 @@ async function scanTicket(imagePath) {
   const apiKey = process.env.OCR_SPACE_API_KEY;
   if (!apiKey) throw new Error("Missing OCR API Key");
 
+  // Procesar la imagen: convertir a escala de grises (blanco y negro) para mejorar el contraste
+  const imageBuffer = await sharp(imagePath)
+    .grayscale()
+    .toBuffer();
+
   const formData = new FormData();
   formData.append("apikey", apiKey);
   formData.append("language", "spa");
-  formData.append("file", fs.createReadStream(imagePath));
+  formData.append("file", imageBuffer, {
+    filename: "ticket.jpg",
+    contentType: "image/jpeg",
+  });
 
   try {
     const response = await axios.post(
@@ -139,15 +148,13 @@ function detectStore(text) {
 
   // Umbral ajustado y priorización de OXXO
   if (matches.bestMatch.rating > 0.35) {
-    // Umbral más bajo para mayor flexibilidad
-    console.log(
-      `Tienda detectada por fuzzy matching: ${matches.bestMatch.target}`
-    );
+    console.log(`Tienda detectada por fuzzy matching: ${matches.bestMatch.target}`);
     return matches.bestMatch.target;
   }
 
+  // Claves de contexto adicionales
   const contextClues = {
-    "RFC\\s*[A-Z0-9]{12,14}": "OXXO", // Ej: RFC TUVAFR9701240
+    "RFC\\s*[A-Z0-9]{12,14}": "OXXO",
     "UNIDAD\\s*TIXCACAL": "Bodega Aurrera",
     "AVISO\\s*DE\\s*PRIVACIDAD": "Soriana",
   };
@@ -166,7 +173,7 @@ function extractTotal(text) {
   const textNorm = normalizeText(text);
   const strategies = [];
 
-  // Estrategia 1: Total en la misma línea o línea siguiente a "TOTAL"
+  // Estrategia 1: Buscar "TOTAL" en la misma línea o la siguiente
   strategies.push(() => {
     const lines = textNorm.split("\n");
     for (let i = 0; i < lines.length; i++) {
@@ -185,14 +192,14 @@ function extractTotal(text) {
     return null;
   });
 
-  // Estrategia 2: Detección clásica con regex mejorada
+  // Estrategia 2: Regex clásica para "TOTAL"
   strategies.push(() => {
     const regex = /TOTAL\s+(\d+[\.,]\d{2})/i;
     const match = textNorm.match(regex);
     return match ? strToFloat(match[1]) : null;
   });
 
-  // Estrategia 3: Excluir efectivo/cambio usando contexto
+  // Estrategia 3: Excluir valores asociados a "EFECTIVO", "CAMBIO", "AJUSTE"
   strategies.push(() => {
     const numbers = textNorm.match(/\d+[\.,]\d{2}/g) || [];
     const excludeKeywords = ["EFECTIVO", "CAMBIO", "AJUSTE"];
@@ -200,20 +207,18 @@ function extractTotal(text) {
       const context = textNorm.substr(textNorm.indexOf(numStr) - 20, 40);
       return !excludeKeywords.some((keyword) => context.includes(keyword));
     });
-    return validNumbers.length > 0
-      ? Math.max(...validNumbers.map(strToFloat))
-      : null;
+    return validNumbers.length > 0 ? Math.max(...validNumbers.map(strToFloat)) : null;
   });
   
-  // Estrategia 4: Máximo numérico con filtros
+  // Estrategia 4: Máximo numérico con filtros adicionales
   strategies.push(() => {
     const exclude = [
       /\d{2}\/\d{2}\/\d{4}/, // Fechas
       /\d{2}:\d{2}/, // Horas
       /C\.P\.\s*\d{5}/, // Códigos postales
       /\d{16,19}/, // Tarjetas
-      /(\d{2}\/\d{2}\/\d{2})/, // Fechas como 13/02/25
-      /(\d{2}:\d{2})/, // Horas como 21:21
+      /(\d{2}\/\d{2}\/\d{2})/, // Fechas con formato 13/02/25
+      /(\d{2}:\d{2})/, // Horas con formato 21:21
       /(C\.P\.\s?\d{5})/,
     ];
 
@@ -231,16 +236,14 @@ function extractTotal(text) {
     return match ? 15.0 : null;
   });
 
-  // Estrategia 6: Usar diferencia efectivo-cambio (50.00 - 35.00 = 15.00)
+  // Estrategia 6: Diferencia entre efectivo y cambio
   strategies.push(() => {
     const efectivo = textNorm.match(/EFECTIVO\s+(\d+[\.,]\d{2})/i);
     const cambio = textNorm.match(/CAMBIO\s+(\d+[\.,]\d{2})/i);
-    return efectivo && cambio
-      ? strToFloat(efectivo[1]) - strToFloat(cambio[1])
-      : null;
+    return efectivo && cambio ? strToFloat(efectivo[1]) - strToFloat(cambio[1]) : null;
   });
 
-  // Ejecutar estrategias
+  // Ejecutar las estrategias y obtener los resultados válidos
   const results = strategies
     .map((strategy) => {
       try {
@@ -251,7 +254,7 @@ function extractTotal(text) {
     })
     .filter((n) => n !== null);
 
-  // Seleccionar valor más frecuente
+  // Seleccionar el valor más frecuente
   const frequency = results.reduce((acc, val) => {
     acc[val] = (acc[val] || 0) + 1;
     return acc;
