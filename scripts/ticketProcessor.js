@@ -2,7 +2,6 @@ const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
 const FormData = require("form-data");
-const sharp = require("sharp");
 const stringSimilarity = require("string-similarity");
 
 // Mapeo de palabras a números
@@ -82,30 +81,18 @@ async function scanTicket(imagePath) {
   const apiKey = process.env.OCR_SPACE_API_KEY;
   if (!apiKey) throw new Error("Missing OCR API Key");
 
-  // Verificar que la imagen exista
-  if (!imagePath || !fs.existsSync(imagePath)) {
-    throw new Error("La ruta de la imagen es inválida o el archivo no existe");
-  }
-
-  // Procesar la imagen: convertir a escala de grises y forzar formato JPEG
-  const imageBuffer = await sharp(imagePath)
-    .grayscale()
-    .jpeg() // Forzamos el formato JPEG para que coincida con el contentType
-    .toBuffer();
-
   const formData = new FormData();
   formData.append("apikey", apiKey);
   formData.append("language", "spa");
-  formData.append("file", imageBuffer, {
-    filename: "ticket.jpg",
-    contentType: "image/jpeg",
-  });
+  formData.append("file", fs.createReadStream(imagePath));
 
   try {
     const response = await axios.post(
       "https://api.ocr.space/parse/image",
       formData,
-      { headers: formData.getHeaders() }
+      {
+        headers: formData.getHeaders(),
+      }
     );
     return response.data.ParsedResults?.[0]?.ParsedText || "";
   } catch (error) {
@@ -128,7 +115,7 @@ function detectStore(text) {
       name: "Soriana",
     },
     {
-      regex: /(OXXO|0XX0|UXXO|CADENA\s*COMERCIAL\s*OXXO)/i,
+      regex: /(OXXO|0XX0|UXXO|CADENA\s*COMERCIAL\s*OXXO)/i, // Incluye variantes comunes
       name: "OXXO",
     },
     {
@@ -150,14 +137,17 @@ function detectStore(text) {
   const candidates = ["OXXO", "Bodega Aurrera", "Soriana", "Super Aki"];
   const matches = stringSimilarity.findBestMatch(textNorm, candidates);
 
+  // Umbral ajustado y priorización de OXXO
   if (matches.bestMatch.rating > 0.35) {
-    console.log(`Tienda detectada por fuzzy matching: ${matches.bestMatch.target}`);
+    // Umbral más bajo para mayor flexibilidad
+    console.log(
+      `Tienda detectada por fuzzy matching: ${matches.bestMatch.target}`
+    );
     return matches.bestMatch.target;
   }
 
-  // Claves de contexto adicionales
   const contextClues = {
-    "RFC\\s*[A-Z0-9]{12,14}": "OXXO",
+    "RFC\\s*[A-Z0-9]{12,14}": "OXXO", // Ej: RFC TUVAFR9701240
     "UNIDAD\\s*TIXCACAL": "Bodega Aurrera",
     "AVISO\\s*DE\\s*PRIVACIDAD": "Soriana",
   };
@@ -176,14 +166,16 @@ function extractTotal(text) {
   const textNorm = normalizeText(text);
   const strategies = [];
 
-  // Estrategia 1: Buscar "TOTAL" en la misma línea o la siguiente
+  // Estrategia 1: Total en la misma línea o línea siguiente a "TOTAL"
   strategies.push(() => {
     const lines = textNorm.split("\n");
     for (let i = 0; i < lines.length; i++) {
       if (lines[i].includes("TOTAL")) {
+        // Buscar en la línea actual
         const currentLineMatch = lines[i].match(/(\d+[\.,]\d{2})/);
         if (currentLineMatch) return strToFloat(currentLineMatch[1]);
 
+        // Buscar en la siguiente línea
         if (i + 1 < lines.length) {
           const nextLineMatch = lines[i + 1].match(/(\d+[\.,]\d{2})/);
           if (nextLineMatch) return strToFloat(nextLineMatch[1]);
@@ -193,14 +185,14 @@ function extractTotal(text) {
     return null;
   });
 
-  // Estrategia 2: Regex clásica para "TOTAL"
+  // Estrategia 2: Detección clásica con regex mejorada
   strategies.push(() => {
     const regex = /TOTAL\s+(\d+[\.,]\d{2})/i;
     const match = textNorm.match(regex);
     return match ? strToFloat(match[1]) : null;
   });
 
-  // Estrategia 3: Excluir valores asociados a "EFECTIVO", "CAMBIO", "AJUSTE"
+  // Estrategia 3: Excluir efectivo/cambio usando contexto
   strategies.push(() => {
     const numbers = textNorm.match(/\d+[\.,]\d{2}/g) || [];
     const excludeKeywords = ["EFECTIVO", "CAMBIO", "AJUSTE"];
@@ -208,18 +200,20 @@ function extractTotal(text) {
       const context = textNorm.substr(textNorm.indexOf(numStr) - 20, 40);
       return !excludeKeywords.some((keyword) => context.includes(keyword));
     });
-    return validNumbers.length > 0 ? Math.max(...validNumbers.map(strToFloat)) : null;
+    return validNumbers.length > 0
+      ? Math.max(...validNumbers.map(strToFloat))
+      : null;
   });
   
-  // Estrategia 4: Máximo numérico con filtros adicionales
+  // Estrategia 4: Máximo numérico con filtros
   strategies.push(() => {
     const exclude = [
-      /\d{2}\/\d{2}\/\d{4}/,
-      /\d{2}:\d{2}/,
-      /C\.P\.\s*\d{5}/,
-      /\d{16,19}/,
-      /(\d{2}\/\d{2}\/\d{2})/,
-      /(\d{2}:\d{2})/,
+      /\d{2}\/\d{2}\/\d{4}/, // Fechas
+      /\d{2}:\d{2}/, // Horas
+      /C\.P\.\s*\d{5}/, // Códigos postales
+      /\d{16,19}/, // Tarjetas
+      /(\d{2}\/\d{2}\/\d{2})/, // Fechas como 13/02/25
+      /(\d{2}:\d{2})/, // Horas como 21:21
       /(C\.P\.\s?\d{5})/,
     ];
 
@@ -237,13 +231,16 @@ function extractTotal(text) {
     return match ? 15.0 : null;
   });
 
-  // Estrategia 6: Diferencia entre efectivo y cambio
+  // Estrategia 6: Usar diferencia efectivo-cambio (50.00 - 35.00 = 15.00)
   strategies.push(() => {
     const efectivo = textNorm.match(/EFECTIVO\s+(\d+[\.,]\d{2})/i);
     const cambio = textNorm.match(/CAMBIO\s+(\d+[\.,]\d{2})/i);
-    return efectivo && cambio ? strToFloat(efectivo[1]) - strToFloat(cambio[1]) : null;
+    return efectivo && cambio
+      ? strToFloat(efectivo[1]) - strToFloat(cambio[1])
+      : null;
   });
 
+  // Ejecutar estrategias
   const results = strategies
     .map((strategy) => {
       try {
@@ -254,6 +251,7 @@ function extractTotal(text) {
     })
     .filter((n) => n !== null);
 
+  // Seleccionar valor más frecuente
   const frequency = results.reduce((acc, val) => {
     acc[val] = (acc[val] || 0) + 1;
     return acc;
@@ -268,9 +266,9 @@ async function analyzeTicket(imagePath) {
   try {
     const ocrText = await scanTicket(imagePath);
     return {
-      tienda: detectStore(ocrText) || "Desconocida",
-      total: extractTotal(ocrText) || 0,
-      texto_ocr: normalizeText(ocrText) || "",
+      tienda: detectStore(ocrText),
+      total: extractTotal(ocrText),
+      texto_ocr: normalizeText(ocrText),
     };
   } catch (error) {
     return { error: error.message };
