@@ -5,6 +5,17 @@ const { analyzeTicket } = require("../scripts/ticketProcessor"); // Ajusta la ru
 const { v4: uuidv4 } = require("uuid");
 const pendingTransactions = new Map();
 
+// Función para registrar errores en el log
+const path = require("path");
+function logError(message) {
+  const logFilePath = path.join(__dirname, "../logs/error.log");
+  const timeStamp = new Date().toISOString();
+  const logMessage = `[${timeStamp}] ${message}\n`;
+  fs.appendFile(logFilePath, logMessage, (err) => {
+    if (err) console.error("Error escribiendo en el log:", err);
+  });
+}
+
 const postGastoFromScan = async (req, res) => {
   let imagePath;
   let transactionStored = false;
@@ -22,8 +33,10 @@ const postGastoFromScan = async (req, res) => {
 
     // 3. Validar resultados del escaneo
     if (!scanResult.total || !scanResult.tienda) {
+      const errorMsg = "No se pudo detectar el total o la tienda en el ticket";
+      logError(`${errorMsg}. OCR: ${scanResult.texto_ocr}`);
       return res.status(400).json({
-        error: "No se pudo detectar el total o la tienda en el ticket",
+        error: errorMsg,
         texto_ocr: scanResult.texto_ocr,
       });
     }
@@ -58,12 +71,16 @@ const postGastoFromScan = async (req, res) => {
     });
   } catch (error) {
     console.error("Error en el controlador:", error.message);
+    logError(`Error en postGastoFromScan: ${error.stack}`);
     res.status(500).json({ error: error.message });
   } finally {
     // Eliminar imagen solo si no se almacenó la transacción
     if (!transactionStored && imagePath) {
       fs.unlink(imagePath, (err) => {
-        if (err) console.error(`Error eliminando imagen: ${err}`);
+        if (err) {
+          console.error(`Error eliminando imagen: ${err}`);
+          logError(`Error eliminando imagen ${imagePath}: ${err}`);
+        }
       });
     }
   }
@@ -116,6 +133,7 @@ const confirmGasto = async (req, res) => {
     }
   } catch (error) {
     console.error("Error en confirmación:", error.message);
+    logError(`Error en confirmGasto: ${error.stack}`);
     res.status(500).json({ error: error.message });
   } finally {
     // Limpieza siempre
@@ -123,7 +141,10 @@ const confirmGasto = async (req, res) => {
       pendingTransactions.delete(transactionId);
       if (transaction.imagePath) {
         fs.unlink(transaction.imagePath, (err) => {
-          if (err) console.error("Error eliminando imagen:", err);
+          if (err) {
+            console.error("Error eliminando imagen:", err);
+            logError(`Error eliminando imagen ${transaction.imagePath}: ${err}`);
+          }
         });
       }
     }
