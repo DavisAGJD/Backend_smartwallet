@@ -82,9 +82,15 @@ async function scanTicket(imagePath) {
   const apiKey = process.env.OCR_SPACE_API_KEY;
   if (!apiKey) throw new Error("Missing OCR API Key");
 
-  // Procesar la imagen: convertir a escala de grises (blanco y negro) para mejorar el contraste
+  // Verificar que la imagen exista
+  if (!imagePath || !fs.existsSync(imagePath)) {
+    throw new Error("La ruta de la imagen es inválida o el archivo no existe");
+  }
+
+  // Procesar la imagen: convertir a escala de grises y forzar formato JPEG
   const imageBuffer = await sharp(imagePath)
     .grayscale()
+    .jpeg() // Forzamos el formato JPEG para que coincida con el contentType
     .toBuffer();
 
   const formData = new FormData();
@@ -99,9 +105,7 @@ async function scanTicket(imagePath) {
     const response = await axios.post(
       "https://api.ocr.space/parse/image",
       formData,
-      {
-        headers: formData.getHeaders(),
-      }
+      { headers: formData.getHeaders() }
     );
     return response.data.ParsedResults?.[0]?.ParsedText || "";
   } catch (error) {
@@ -124,7 +128,7 @@ function detectStore(text) {
       name: "Soriana",
     },
     {
-      regex: /(OXXO|0XX0|UXXO|CADENA\s*COMERCIAL\s*OXXO)/i, // Incluye variantes comunes
+      regex: /(OXXO|0XX0|UXXO|CADENA\s*COMERCIAL\s*OXXO)/i,
       name: "OXXO",
     },
     {
@@ -146,7 +150,6 @@ function detectStore(text) {
   const candidates = ["OXXO", "Bodega Aurrera", "Soriana", "Super Aki"];
   const matches = stringSimilarity.findBestMatch(textNorm, candidates);
 
-  // Umbral ajustado y priorización de OXXO
   if (matches.bestMatch.rating > 0.35) {
     console.log(`Tienda detectada por fuzzy matching: ${matches.bestMatch.target}`);
     return matches.bestMatch.target;
@@ -178,11 +181,9 @@ function extractTotal(text) {
     const lines = textNorm.split("\n");
     for (let i = 0; i < lines.length; i++) {
       if (lines[i].includes("TOTAL")) {
-        // Buscar en la línea actual
         const currentLineMatch = lines[i].match(/(\d+[\.,]\d{2})/);
         if (currentLineMatch) return strToFloat(currentLineMatch[1]);
 
-        // Buscar en la siguiente línea
         if (i + 1 < lines.length) {
           const nextLineMatch = lines[i + 1].match(/(\d+[\.,]\d{2})/);
           if (nextLineMatch) return strToFloat(nextLineMatch[1]);
@@ -213,12 +214,12 @@ function extractTotal(text) {
   // Estrategia 4: Máximo numérico con filtros adicionales
   strategies.push(() => {
     const exclude = [
-      /\d{2}\/\d{2}\/\d{4}/, // Fechas
-      /\d{2}:\d{2}/, // Horas
-      /C\.P\.\s*\d{5}/, // Códigos postales
-      /\d{16,19}/, // Tarjetas
-      /(\d{2}\/\d{2}\/\d{2})/, // Fechas con formato 13/02/25
-      /(\d{2}:\d{2})/, // Horas con formato 21:21
+      /\d{2}\/\d{2}\/\d{4}/,
+      /\d{2}:\d{2}/,
+      /C\.P\.\s*\d{5}/,
+      /\d{16,19}/,
+      /(\d{2}\/\d{2}\/\d{2})/,
+      /(\d{2}:\d{2})/,
       /(C\.P\.\s?\d{5})/,
     ];
 
@@ -243,7 +244,6 @@ function extractTotal(text) {
     return efectivo && cambio ? strToFloat(efectivo[1]) - strToFloat(cambio[1]) : null;
   });
 
-  // Ejecutar las estrategias y obtener los resultados válidos
   const results = strategies
     .map((strategy) => {
       try {
@@ -254,7 +254,6 @@ function extractTotal(text) {
     })
     .filter((n) => n !== null);
 
-  // Seleccionar el valor más frecuente
   const frequency = results.reduce((acc, val) => {
     acc[val] = (acc[val] || 0) + 1;
     return acc;
@@ -269,9 +268,9 @@ async function analyzeTicket(imagePath) {
   try {
     const ocrText = await scanTicket(imagePath);
     return {
-      tienda: detectStore(ocrText),
-      total: extractTotal(ocrText),
-      texto_ocr: normalizeText(ocrText),
+      tienda: detectStore(ocrText) || "Desconocida",
+      total: extractTotal(ocrText) || 0,
+      texto_ocr: normalizeText(ocrText) || "",
     };
   } catch (error) {
     return { error: error.message };
