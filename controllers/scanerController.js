@@ -35,7 +35,7 @@ const postGastoFromScan = async (req, res) => {
     // 4. Crear objeto gasto temporal
     const nuevoGasto = {
       monto: scanResult.total,
-      categoria_gasto_id: 30,
+      categoria_gasto_id: 11,
       descripcion: `Compra en ${scanResult.tienda}`,
     };
 
