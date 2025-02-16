@@ -1,34 +1,26 @@
-// controllers/gastos.js
-const fs = require("fs");
 const Gasto = require("../models/gastos");
-const { analyzeTicket } = require("../scripts/ticketProcessor"); // Ajusta la ruta según tu estructura
+const { analyzeTicket } = require("../scripts/ticketProcessor");
 const { v4: uuidv4 } = require("uuid");
 const pendingTransactions = new Map();
 
 function logError(message, error = null) {
   const timeStamp = new Date().toISOString();
   console.error(`[${timeStamp}] ERROR: ${message}`);
-  
   if (error) {
     console.error("Detalles del error:", error);
   }
 }
 
-
 const postGastoFromScan = async (req, res) => {
-  let imagePath;
-  let transactionStored = false;
-
   try {
     // 1. Verificar autenticación
     const usuario_id = req.userId;
-
-    // 2. Procesar imagen
     if (!req.file) {
       return res.status(400).json({ error: "No se subió ninguna imagen" });
     }
-    imagePath = req.file.path;
-    const scanResult = await analyzeTicket(imagePath);
+
+    // 2. Procesar imagen (usando req.file.buffer)
+    const scanResult = await analyzeTicket(req.file.buffer);
 
     // 3. Validar resultados del escaneo
     if (!scanResult.total || !scanResult.tienda) {
@@ -43,7 +35,7 @@ const postGastoFromScan = async (req, res) => {
     // 4. Crear objeto gasto temporal
     const nuevoGasto = {
       monto: scanResult.total,
-      categoria_gasto_id: 11,
+      categoria_gasto_id: 30,
       descripcion: `Compra en ${scanResult.tienda}`,
     };
 
@@ -52,10 +44,8 @@ const postGastoFromScan = async (req, res) => {
     pendingTransactions.set(transactionId, {
       usuario_id,
       nuevoGasto,
-      imagePath,
       scanResult,
     });
-    transactionStored = true;
 
     // 6. Responder con datos para confirmación
     res.status(200).json({
@@ -72,33 +62,18 @@ const postGastoFromScan = async (req, res) => {
     console.error("Error en el controlador:", error.message);
     logError(`Error en postGastoFromScan: ${error.stack}`);
     res.status(500).json({ error: error.message });
-  } finally {
-    // Eliminar imagen solo si no se almacenó la transacción
-    if (!transactionStored && imagePath) {
-      fs.unlink(imagePath, (err) => {
-        if (err) {
-          console.error(`Error eliminando imagen: ${err}`);
-          logError(`Error eliminando imagen ${imagePath}: ${err}`);
-        }
-      });
-    }
   }
 };
 
 const confirmGasto = async (req, res) => {
   const { transactionId, confirm } = req.body;
-  let transaction; // Declarar la variable fuera del try
-
+  let transaction;
   try {
     transaction = pendingTransactions.get(transactionId);
     if (!transaction) {
-      return res
-        .status(404)
-        .json({ error: "Transacción no válida o expirada" });
+      return res.status(404).json({ error: "Transacción no válida o expirada" });
     }
-
-    const { usuario_id, nuevoGasto, imagePath, scanResult } = transaction;
-
+    const { usuario_id, nuevoGasto, scanResult } = transaction;
     if (confirm) {
       // 1. Crear gasto en BD
       const gastoData = await new Promise((resolve, reject) => {
@@ -107,7 +82,6 @@ const confirmGasto = async (req, res) => {
           resolve(data);
         });
       });
-
       // 2. Actualizar puntos
       await new Promise((resolve, reject) => {
         Gasto.agregarPuntos(usuario_id, 10, (err, result) => {
@@ -115,7 +89,6 @@ const confirmGasto = async (req, res) => {
           resolve();
         });
       });
-
       res.status(201).json({
         message: "Gasto confirmado exitosamente",
         data: {
@@ -135,18 +108,7 @@ const confirmGasto = async (req, res) => {
     logError(`Error en confirmGasto: ${error.stack}`);
     res.status(500).json({ error: error.message });
   } finally {
-    // Limpieza siempre
-    if (transaction) {
-      pendingTransactions.delete(transactionId);
-      if (transaction.imagePath) {
-        fs.unlink(transaction.imagePath, (err) => {
-          if (err) {
-            console.error("Error eliminando imagen:", err);
-            logError(`Error eliminando imagen ${transaction.imagePath}: ${err}`);
-          }
-        });
-      }
-    }
+    pendingTransactions.delete(transactionId);
   }
 };
 

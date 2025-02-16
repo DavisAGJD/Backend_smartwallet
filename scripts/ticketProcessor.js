@@ -1,40 +1,17 @@
-const fs = require("fs");
-const path = require("path");
 const axios = require("axios");
 const FormData = require("form-data");
 const stringSimilarity = require("string-similarity");
+const sharp = require("sharp");
 
-// Mapeo de palabras a números
+// Mapeo de palabras a números (igual que antes)
 const wordNumberMap = {
-  UNO: 1,
-  DOS: 2,
-  TRES: 3,
-  CUATRO: 4,
-  CINCO: 5,
-  SEIS: 6,
-  SIETE: 7,
-  OCHO: 8,
-  NUEVE: 9,
-  DIEZ: 10,
-  ONCE: 11,
-  DOCE: 12,
-  TRECE: 13,
-  CATORCE: 14,
-  QUINCE: 15,
-  DIECISEIS: 16,
-  DIECISIETE: 17,
-  DIECIOCHO: 18,
-  DIECINUEVE: 19,
-  VEINTE: 20,
-  TREINTA: 30,
-  CUARENTA: 40,
-  CINCUENTA: 50,
-  SESENTA: 60,
-  SETENTA: 70,
-  OCHENTA: 80,
-  NOVENTA: 90,
-  CIEN: 100,
-  MIL: 1000,
+  UNO: 1, DOS: 2, TRES: 3, CUATRO: 4, CINCO: 5,
+  SEIS: 6, SIETE: 7, OCHO: 8, NUEVE: 9, DIEZ: 10,
+  ONCE: 11, DOCE: 12, TRECE: 13, CATORCE: 14, QUINCE: 15,
+  DIECISEIS: 16, DIECISIETE: 17, DIECIOCHO: 18, DIECINUEVE: 19,
+  VEINTE: 20, TREINTA: 30, CUARENTA: 40, CINCUENTA: 50,
+  SESENTA: 60, SETENTA: 70, OCHENTA: 80, NOVENTA: 90,
+  CIEN: 100, MIL: 1000,
 };
 
 function normalizeText(text) {
@@ -62,7 +39,6 @@ function wordsToNumber(words) {
   const parts = words.split(/\s+/);
   let total = 0;
   let current = 0;
-
   for (const word of parts) {
     const num = wordNumberMap[word] || 0;
     if (num >= 100) {
@@ -77,26 +53,41 @@ function wordsToNumber(words) {
   return total + current;
 }
 
-async function scanTicket(imagePath) {
+async function scanTicket(fileBuffer) {
   const apiKey = process.env.OCR_SPACE_API_KEY;
   if (!apiKey) throw new Error("Missing OCR API Key");
 
-  const formData = new FormData();
-  formData.append("apikey", apiKey);
-  formData.append("language", "spa");
-  formData.append("file", fs.createReadStream(imagePath));
-
   try {
+    // Procesa la imagen desde el buffer
+    const processedImage = await sharp(fileBuffer)
+      .rotate()
+      .resize({ width: 2000, withoutEnlargement: true })
+      .greyscale()
+      .modulate({ brightness: 1.1 })
+      .normalise({ upper: 96 })
+      .sharpen({ sigma: 0.8, m1: 1, m2: 3 })
+      .linear(1.1, -(64 * 0.1))
+      .toBuffer();
+
+    const formData = new FormData();
+    formData.append("apikey", apiKey);
+    formData.append("language", "spa");
+    formData.append("OCREngine", "2");
+    formData.append("isTable", "true");
+    formData.append("file", processedImage, {
+      filename: "processed.jpg",
+      contentType: "image/jpeg",
+    });
+
     const response = await axios.post(
       "https://api.ocr.space/parse/image",
       formData,
-      {
-        headers: formData.getHeaders(),
-      }
+      { headers: formData.getHeaders() }
     );
+
     return response.data.ParsedResults?.[0]?.ParsedText || "";
   } catch (error) {
-    throw new Error("OCR Error: " + error.message);
+    throw new Error("Image processing/OCR Error: " + error.message);
   }
 }
 
@@ -104,50 +95,29 @@ function detectStore(text) {
   const textNorm = normalizeText(text);
   const lines = textNorm.split("\n").slice(0, 10);
 
-  // Detección por patrones clave
   const storePatterns = [
-    {
-      regex: /(BODEGA\s*?AURRERA|BODEGAAURRERA|WAL\s*?MART)/i,
-      name: "Bodega Aurrera",
-    },
-    {
-      regex: /(SORIANA|TIENDAS\s*SORIANA)/i,
-      name: "Soriana",
-    },
-    {
-      regex: /(OXXO|0XX0|UXXO|CADENA\s*COMERCIAL\s*OXXO)/i, // Incluye variantes comunes
-      name: "OXXO",
-    },
-    {
-      regex: /(SUPER\s*AKI|SURPER\s*AKI|AKI\s*GH)/i,
-      name: "Super Aki",
-    },
+    { regex: /(BODEGA\s*?AURRERA|BODEGAAURRERA|WAL\s*?MART)/i, name: "Bodega Aurrera" },
+    { regex: /(SORIANA|TIENDAS\s*SORIANA)/i, name: "Soriana" },
+    { regex: /(OXXO|0XX0|UXXO|CADENA\s*COMERCIAL\s*OXXO)/i, name: "OXXO" },
+    { regex: /(SUPER\s*AKI|SURPER\s*AKI|AKI\s*GH)/i, name: "Super Aki" },
   ];
 
-  // Búsqueda por patrones
   for (const { regex, name } of storePatterns) {
-    const match = textNorm.match(regex);
-    if (match) {
+    if (textNorm.match(regex)) {
       console.log(`Tienda detectada por regex: ${name}`);
       return name;
     }
   }
 
-  // Fuzzy matching como último recurso
   const candidates = ["OXXO", "Bodega Aurrera", "Soriana", "Super Aki"];
   const matches = stringSimilarity.findBestMatch(textNorm, candidates);
-
-  // Umbral ajustado y priorización de OXXO
   if (matches.bestMatch.rating > 0.35) {
-    // Umbral más bajo para mayor flexibilidad
-    console.log(
-      `Tienda detectada por fuzzy matching: ${matches.bestMatch.target}`
-    );
+    console.log(`Tienda detectada por fuzzy matching: ${matches.bestMatch.target}`);
     return matches.bestMatch.target;
   }
 
   const contextClues = {
-    "RFC\\s*[A-Z0-9]{12,14}": "OXXO", // Ej: RFC TUVAFR9701240
+    "RFC\\s*[A-Z0-9]{12,14}": "OXXO",
     "UNIDAD\\s*TIXCACAL": "Bodega Aurrera",
     "AVISO\\s*DE\\s*PRIVACIDAD": "Soriana",
   };
@@ -166,16 +136,12 @@ function extractTotal(text) {
   const textNorm = normalizeText(text);
   const strategies = [];
 
-  // Estrategia 1: Total en la misma línea o línea siguiente a "TOTAL"
   strategies.push(() => {
     const lines = textNorm.split("\n");
     for (let i = 0; i < lines.length; i++) {
       if (lines[i].includes("TOTAL")) {
-        // Buscar en la línea actual
         const currentLineMatch = lines[i].match(/(\d+[\.,]\d{2})/);
         if (currentLineMatch) return strToFloat(currentLineMatch[1]);
-
-        // Buscar en la siguiente línea
         if (i + 1 < lines.length) {
           const nextLineMatch = lines[i + 1].match(/(\d+[\.,]\d{2})/);
           if (nextLineMatch) return strToFloat(nextLineMatch[1]);
@@ -185,14 +151,12 @@ function extractTotal(text) {
     return null;
   });
 
-  // Estrategia 2: Detección clásica con regex mejorada
   strategies.push(() => {
     const regex = /TOTAL\s+(\d+[\.,]\d{2})/i;
     const match = textNorm.match(regex);
     return match ? strToFloat(match[1]) : null;
   });
 
-  // Estrategia 3: Excluir efectivo/cambio usando contexto
   strategies.push(() => {
     const numbers = textNorm.match(/\d+[\.,]\d{2}/g) || [];
     const excludeKeywords = ["EFECTIVO", "CAMBIO", "AJUSTE"];
@@ -200,47 +164,37 @@ function extractTotal(text) {
       const context = textNorm.substr(textNorm.indexOf(numStr) - 20, 40);
       return !excludeKeywords.some((keyword) => context.includes(keyword));
     });
-    return validNumbers.length > 0
-      ? Math.max(...validNumbers.map(strToFloat))
-      : null;
+    return validNumbers.length > 0 ? Math.max(...validNumbers.map(strToFloat)) : null;
   });
-  
-  // Estrategia 4: Máximo numérico con filtros
+
   strategies.push(() => {
     const exclude = [
-      /\d{2}\/\d{2}\/\d{4}/, // Fechas
-      /\d{2}:\d{2}/, // Horas
-      /C\.P\.\s*\d{5}/, // Códigos postales
-      /\d{16,19}/, // Tarjetas
-      /(\d{2}\/\d{2}\/\d{2})/, // Fechas como 13/02/25
-      /(\d{2}:\d{2})/, // Horas como 21:21
+      /\d{2}\/\d{2}\/\d{4}/,
+      /\d{2}:\d{2}/,
+      /C\.P\.\s*\d{5}/,
+      /\d{16,19}/,
+      /(\d{2}\/\d{2}\/\d{2})/,
+      /(\d{2}:\d{2})/,
       /(C\.P\.\s?\d{5})/,
     ];
-
     const numbers = textNorm.match(/\d+[\.,]\d{2}/g) || [];
     const valid = numbers
       .map(strToFloat)
       .filter((n) => n > 1 && n < 10000 && !exclude.some((p) => p.test(n)));
-
     return valid.length > 0 ? Math.max(...valid) : null;
   });
 
-  // Estrategia 5: Capturar "QUINCE PESOS 00/100"
   strategies.push(() => {
     const match = textNorm.match(/QUINCE\s+PESOS\s+00\/100/i);
     return match ? 15.0 : null;
   });
 
-  // Estrategia 6: Usar diferencia efectivo-cambio (50.00 - 35.00 = 15.00)
   strategies.push(() => {
     const efectivo = textNorm.match(/EFECTIVO\s+(\d+[\.,]\d{2})/i);
     const cambio = textNorm.match(/CAMBIO\s+(\d+[\.,]\d{2})/i);
-    return efectivo && cambio
-      ? strToFloat(efectivo[1]) - strToFloat(cambio[1])
-      : null;
+    return efectivo && cambio ? strToFloat(efectivo[1]) - strToFloat(cambio[1]) : null;
   });
 
-  // Ejecutar estrategias
   const results = strategies
     .map((strategy) => {
       try {
@@ -251,7 +205,6 @@ function extractTotal(text) {
     })
     .filter((n) => n !== null);
 
-  // Seleccionar valor más frecuente
   const frequency = results.reduce((acc, val) => {
     acc[val] = (acc[val] || 0) + 1;
     return acc;
@@ -262,9 +215,9 @@ function extractTotal(text) {
     : null;
 }
 
-async function analyzeTicket(imagePath) {
+async function analyzeTicket(fileBuffer) {
   try {
-    const ocrText = await scanTicket(imagePath);
+    const ocrText = await scanTicket(fileBuffer);
     return {
       tienda: detectStore(ocrText),
       total: extractTotal(ocrText),
