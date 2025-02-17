@@ -45,7 +45,7 @@ const scanerRoutes = require("./routes/scanRoutes");
 // Configuración de CORS
 app.use(
   cors({
-    origin: "https://smartwallet-front.vercel.app", // Cambia este URL por el dominio de tu frontend
+    origin: ["https://smartwallet-front.vercel.app", "https://api.imgbb.com/"], // Cambia este URL por el dominio de tu frontend
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true, // Para cookies o sesiones
   })
