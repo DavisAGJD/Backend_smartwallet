@@ -9,7 +9,6 @@ const Usuario = {
     });
   },
 
-  // En el modelo Usuario
   getById: (id, callback) => {
     db.query(
       "SELECT * FROM usuarios WHERE usuario_id = ?",
@@ -18,12 +17,11 @@ const Usuario = {
         if (err) {
           return callback(err, null);
         }
-        callback(null, results[0]); // Devuelve el primer usuario que coincida con el ID
+        callback(null, results[0]);
       }
     );
   },
 
-  // Obtener el total de usuarios
   getTotalUsuarios: (callback) => {
     const query = "SELECT COUNT(*) AS totalUsuarios FROM usuarios";
     db.query(query, (err, results) => {
@@ -32,7 +30,6 @@ const Usuario = {
     });
   },
 
-  // Obtener los usuarios registrados en el mes actual
   getUsuariosMesActual: (callback) => {
     const query = `
       SELECT COUNT(*) AS usuariosMes 
@@ -46,7 +43,6 @@ const Usuario = {
     });
   },
 
-  // Obtener datos para la gráfica (usuarios por mes)
   getGraficaUsuarios: (callback) => {
     const query = `
       SELECT DATE_FORMAT(fecha_registro, '%Y-%m') AS month, COUNT(*) AS value 
@@ -71,7 +67,7 @@ const Usuario = {
 
   getUsuariosPaginados: (offset, limit, callback) => {
     const query = `
-      SELECT nombre_usuario, fecha_registro, tipo_suscripcion
+      SELECT nombre_usuario, fecha_registro, tipo_suscripcion, image
       FROM usuarios
       LIMIT ? OFFSET ?
     `;
@@ -82,22 +78,17 @@ const Usuario = {
   },
 
   create: (data, callback) => {
-    const { nombre_usuario, email, password_usuario } = data;
+    const { nombre_usuario, email, password_usuario, image } = data;
     const query = `
-      INSERT INTO usuarios (nombre_usuario, email, password_usuario)
-      VALUES (?, ?, ?)
+      INSERT INTO usuarios (nombre_usuario, email, password_usuario, image)
+      VALUES (?, ?, ?, ?)
     `;
-    db.query(
-      query,
-      [nombre_usuario, email, password_usuario],
-      (err, result) => {
-        if (err) return callback(err, null);
-        callback(null, result);
-      }
-    );
+    db.query(query, [nombre_usuario, email, password_usuario, image], (err, result) => {
+      if (err) return callback(err, null);
+      callback(null, result);
+    });
   },
 
-  // Modelo de actualización de usuario
   updateData: (usuario_id, data, callback) => {
     const fields = [];
     const values = [];
@@ -115,9 +106,12 @@ const Usuario = {
       values.push(data.password_usuario);
     }
     if (data.ingresos !== undefined) {
-      // Añadido campo de ingresos
       fields.push("ingresos = ?");
       values.push(data.ingresos);
+    }
+    if (data.image) {
+      fields.push("image = ?");
+      values.push(data.image);
     }
 
     if (fields.length === 0) {
@@ -125,10 +119,10 @@ const Usuario = {
     }
 
     const query = `
-    UPDATE usuarios
-    SET ${fields.join(", ")}
-    WHERE usuario_id = ?
-  `;
+      UPDATE usuarios
+      SET ${fields.join(", ")}
+      WHERE usuario_id = ?
+    `;
     values.push(usuario_id);
 
     db.query(query, values, (err, result) => {
@@ -145,7 +139,6 @@ const Usuario = {
     });
   },
 
-  // Método para actualizar la información de login
   updateLoginInfo: (usuarioId, firstLogin, lastLogin, racha, callback) => {
     const query = `UPDATE usuarios SET first_login = ?, last_login = ?, racha = ? WHERE usuario_id = ?`;
     const values = [firstLogin, lastLogin, racha, usuarioId];
