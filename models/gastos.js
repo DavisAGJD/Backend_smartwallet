@@ -37,6 +37,20 @@ const Gasto = {
     });
   },
 
+  getTotalGastosByUserId: (usuario_id, callback) => {
+    const query = `
+      SELECT COUNT(*) as total 
+      FROM gastos 
+      WHERE usuario_id = ?`;
+    db.query(query, [usuario_id], (err, results) => {
+      if (err) {
+        console.error("Error al obtener el total de gastos:", err);
+        return callback(err, null);
+      }
+      callback(null, results[0].total);
+    });
+  },
+
   // Obtener todos los gastos de un usuario por ID
   getByUserId: (usuario_id, callback) => {
     const query = `
