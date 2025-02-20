@@ -22,6 +22,21 @@ const Gasto = {
     });
   },
 
+  getGastosPaginadosByUserId: (usuario_id, offset, limit, callback) => {
+    const query = `
+      SELECT * FROM gastos 
+      WHERE usuario_id = ? 
+      ORDER BY fecha DESC 
+      LIMIT ? OFFSET ?`;
+    db.query(query, [usuario_id, limit, offset], (err, results) => {
+      if (err) {
+        console.error("Error al obtener gastos paginados:", err);
+        return callback(err, null);
+      }
+      callback(null, results);
+    });
+  },
+
   // Obtener todos los gastos de un usuario por ID
   getByUserId: (usuario_id, callback) => {
     const query = `
@@ -74,7 +89,6 @@ const Gasto = {
       callback(null, results[0].total); // Devuelve el total de gastos
     });
   },
-
 
   // Actualizar un gasto por ID
   updateData: (id_gasto, usuario_id, data, callback) => {
