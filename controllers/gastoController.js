@@ -384,6 +384,41 @@ async function analyzeTicket(fileBuffer) {
   }
 }
 
+const getGastosPaginadosByUserId = (req, res) => {
+  // Se espera que el id del usuario venga en los parámetros de la ruta
+  const { usuario_id } = req.params;
+  
+  // Parámetros de paginación obtenidos de la query (por defecto: page 1, 10 elementos por página)
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const offset = (page - 1) * limit;
+
+  // Se obtiene la "página" de gastos para el usuario
+  Gasto.getGastosPaginadosByUserId(usuario_id, offset, limit, (err, data) => {
+    if (err) {
+      return res.status(500).json({ error: "Error al obtener gastos paginados del usuario" });
+    }
+
+    // Se obtiene el total de gastos del usuario para calcular la cantidad total de páginas
+    Gasto.getTotalGastosByUserId(usuario_id, (err, total) => {
+      if (err) {
+        return res.status(500).json({ error: "Error al obtener el total de gastos del usuario" });
+      }
+
+      const totalPages = Math.ceil(total / limit);
+      res.status(200).json({
+        data: data,
+        pagination: {
+          total: total,
+          page: page,
+          pageSize: limit,
+          totalPages: totalPages,
+        },
+      });
+    });
+  });
+};
+
 const postGastoFromScan = async (req, res) => {
   try {
     // 1. Verificar autenticación (se asume que req.userId ya fue asignado por un middleware)
@@ -445,5 +480,6 @@ module.exports = {
   putGasto,
   deleteGasto,
   getGastosPaginados,
-  postGastoFromScan
+  postGastoFromScan,
+  getGastosPaginadosByUserId
 };

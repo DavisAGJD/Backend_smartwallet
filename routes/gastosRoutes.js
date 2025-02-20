@@ -11,5 +11,7 @@ router.put("/update/:id_gasto", token.verificarToken, gastosController.putGasto)
 router.delete("/delete/:id_gasto", gastosController.deleteGasto);
 router.get("/paginados", gastosController.getGastosPaginados);
 router.post("/gastoScan", token.verificarToken, gastosController.postGastoFromScan);
+router.get("/user/:usuario_id/paginados", gastosController.getGastosPaginadosByUserId);
+
 
 module.exports = router;
