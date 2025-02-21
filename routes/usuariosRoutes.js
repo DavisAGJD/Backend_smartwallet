@@ -5,10 +5,14 @@ const { verificarToken } = require("../middleware/authMiddleware");
 
 router.get("/", usuariosController.getUsuarios);
 router.get("/info", usuariosController.getInfoUsuarios);
-router.get("/cookbook/info-user/:id", usuariosController.getUsuarioByIdCookBook);
+router.get(
+  "/cookbook/info-user/:id",
+  usuariosController.getUsuarioByIdCookBook
+);
 router.post("/register", usuariosController.createUsuarios);
 router.get("/paginados", usuariosController.getUsuariosPaginados);
 router.post("/login", usuariosController.loginUsuario);
+router.post("/logout", verificarToken, usuariosController.logoutUsuario);
 router.put("/update/:usuario_id", usuariosController.putUsuario);
 router.delete("/delete/:usuario_id", usuariosController.deleteUsuario);
 router.post(
@@ -28,5 +32,10 @@ router.put("/update-image/:usuario_id", usuariosController.updateUsuarioImage);
 
 // Nueva ruta para obtener datos para la gráfica de usuarios
 router.get("/grafica-usuarios", usuariosController.getGraficaUsuarios);
+router.get(
+  "/gastoYSalario",
+  verificarToken,
+  usuariosController.getGastosYSalario
+);
 
 module.exports = router;

@@ -83,10 +83,14 @@ const Usuario = {
       INSERT INTO usuarios (nombre_usuario, email, password_usuario, image)
       VALUES (?, ?, ?, ?)
     `;
-    db.query(query, [nombre_usuario, email, password_usuario, image], (err, result) => {
-      if (err) return callback(err, null);
-      callback(null, result);
-    });
+    db.query(
+      query,
+      [nombre_usuario, email, password_usuario, image],
+      (err, result) => {
+        if (err) return callback(err, null);
+        callback(null, result);
+      }
+    );
   },
 
   updateData: (usuario_id, data, callback) => {
@@ -143,6 +147,32 @@ const Usuario = {
     const query = `UPDATE usuarios SET first_login = ?, last_login = ?, racha = ? WHERE usuario_id = ?`;
     const values = [firstLogin, lastLogin, racha, usuarioId];
     db.query(query, values, callback);
+  },
+
+  getGastosYSalario: (usuario_id, callback) => {
+    // Primero, obtenemos los ingresos del usuario
+    db.query(
+      "SELECT ingresos FROM usuarios WHERE usuario_id = ?",
+      [usuario_id],
+      (err, usuarioResult) => {
+        if (err) return callback(err, null);
+        if (usuarioResult.length === 0)
+          return callback({ kind: "not_found" }, null);
+
+        const ingresos = usuarioResult[0].ingresos || 0;
+
+        // Luego, se suman todos los gastos asociados al usuario
+        db.query(
+          "SELECT SUM(monto) AS totalGastos FROM gastos WHERE usuario_id = ?",
+          [usuario_id],
+          (err, gastosResult) => {
+            if (err) return callback(err, null);
+            const totalGastos = gastosResult[0].totalGastos || 0;
+            callback(null, { ingresos, totalGastos });
+          }
+        );
+      }
+    );
   },
 };
 

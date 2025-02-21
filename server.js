@@ -37,7 +37,6 @@ const recordatoriosRoutes = require("./routes/recordatoriosRoutes");
 const reportesRoutes = require("./routes/reportesRoutes");
 const ingresoRoutes = require("./routes/ingresoRoutes");
 const notificacionesRoutes = require("./routes/notificacionesRoutes");
-const scanerRoutes = require("./routes/scanRoutes");
 
 // Importa el controlador de IA
 //const { analyzeText, checkModel, } = require("./config/iaController");
@@ -62,7 +61,6 @@ app.use("/api/recordatorios", recordatoriosRoutes);
 app.use("/api/reportes", reportesRoutes);
 app.use("/api/ingresos", ingresoRoutes);
 app.use("/api/notificaciones", notificacionesRoutes);
-app.use("/api/scaner", scanerRoutes);
 app.use(express.json({ limit: '10mb' })); // Aumenta el límite de tamaño
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
