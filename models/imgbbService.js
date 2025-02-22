@@ -15,7 +15,10 @@ const uploadImageToImgBB = async (imageBuffer) => {
 
   // Crear el formulario y adjuntar la imagen
   const formData = new FormData();
-  formData.append('image', imageBuffer.toString('base64'));
+  formData.append('image', imageBuffer, { 
+    filename: 'imagen.jpg',
+    contentType: 'image/jpeg'
+  });
 
   try {
     // Subir la imagen a ImgBB
