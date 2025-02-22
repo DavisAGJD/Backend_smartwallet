@@ -3,7 +3,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const db = require("../config/db");
 require("dotenv").config();
-const { uploadImageToImgBB } = require("../models/imgbbService"); // Añade esto al inicio
+const { uploadImageToCloudinary } = require("../models/cloudinaryService"); // Añade esto al inicio
 const multer = require("multer");
 let blacklistedTokens = [];
 
@@ -267,7 +267,7 @@ const updateUsuarioImage = async (req, res) => {
       return res.status(400).json({ error: "No se envió ninguna imagen" });
     }
 
-    const imageUrl = await uploadImageToImgBB(req.file.buffer);
+    const imageUrl = await uploadImageToCloudinary(req.file.buffer);
 
     db.query(
       "UPDATE usuarios SET image = ? WHERE usuario_id = ?",
