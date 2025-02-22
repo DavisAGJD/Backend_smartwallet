@@ -8,28 +8,25 @@ const uploadImageToImgBB = async (imageBuffer) => {
       throw new Error("Buffer de imagen inválido");
     }
 
-    // Convertir a base64 URL-safe (requerido por ImgBB)
-    const base64Data = imageBuffer.toString("base64")
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/, "");
+    // 1. Usar base64 estándar SIN modificaciones
+    const base64Data = imageBuffer.toString("base64");
 
-    // Configurar form-data
+    // 2. Crear payload con formato correcto
     const formData = new FormData();
-    formData.append("image", base64Data); // ¡Clave! No usar buffer directamente
+    formData.append("image", base64Data); // ← Base64 puro
 
-    // Headers personalizados para evitar bloqueos
+    // 3. Headers esenciales
     const headers = {
       ...formData.getHeaders(),
-      "User-Agent": "MyFinanceApp/1.0 (https://tuapp.com)",
+      "User-Agent": "MyFinanceApp/1.0",
       "Accept": "application/json"
     };
 
-    // Hacer la petición
+    // 4. Enviar petición
     const response = await axios.post("https://api.imgbb.com/1/upload", formData, {
       params: {
         key: process.env.IMGBB_API_KEY,
-        expiration: 600 // Opcional: 10 minutos de expiración
+        expiration: 600
       },
       headers: headers
     });
@@ -37,19 +34,14 @@ const uploadImageToImgBB = async (imageBuffer) => {
     return response.data.data.url;
 
   } catch (error) {
-    // Manejo detallado de errores
-    let errorMessage = "Error al subir imagen";
+    // Manejo mejorado de errores
+    let errorDetails = "Error desconocido";
     
-    if (error.response) {
-      const { status, data } = error.response;
-      errorMessage = `ImgBB Error ${status}: ${data.error?.message || "Sin mensaje"}`;
-    } else if (error.request) {
-      errorMessage = "No se recibió respuesta de ImgBB";
-    } else {
-      errorMessage = `Error interno: ${error.message}`;
+    if (error.response?.data?.error) {
+      errorDetails = `${error.response.data.error.message} (código: ${error.response.data.error.code})`;
     }
-
-    throw new Error(errorMessage);
+    
+    throw new Error(`Fallo en ImgBB: ${errorDetails}`);
   }
 };
 
