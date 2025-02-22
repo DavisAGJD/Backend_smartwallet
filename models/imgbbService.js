@@ -1,43 +1,55 @@
-const FormData = require('form-data');
-const axios = require('axios');
+const FormData = require("form-data");
+const axios = require("axios");
 
 const uploadImageToImgBB = async (imageBuffer) => {
-  // Validación del buffer de la imagen
-  if (!imageBuffer || imageBuffer.length === 0) {
-    throw new Error("El buffer de la imagen está vacío o es inválido.");
-  }
-
-  // Validación del tamaño de la imagen
-  const MAX_IMAGE_SIZE = 32 * 1024 * 1024; // 32 MB
-  if (imageBuffer.length > MAX_IMAGE_SIZE) {
-    throw new Error("La imagen es demasiado grande. El tamaño máximo permitido es 32 MB.");
-  }
-
-  // Crear el formulario y adjuntar la imagen
-  const formData = new FormData();
-  formData.append('image', imageBuffer, { 
-    filename: 'imagen.jpg',
-    contentType: 'image/jpeg'
-  });
-
   try {
-    // Subir la imagen a ImgBB
-    const response = await axios.post('https://api.imgbb.com/1/upload', formData, {
+    // Validación del buffer
+    if (!imageBuffer || imageBuffer.length === 0) {
+      throw new Error("Buffer de imagen inválido");
+    }
+
+    // Convertir a base64 URL-safe (requerido por ImgBB)
+    const base64Data = imageBuffer.toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+
+    // Configurar form-data
+    const formData = new FormData();
+    formData.append("image", base64Data); // ¡Clave! No usar buffer directamente
+
+    // Headers personalizados para evitar bloqueos
+    const headers = {
+      ...formData.getHeaders(),
+      "User-Agent": "MyFinanceApp/1.0 (https://tuapp.com)",
+      "Accept": "application/json"
+    };
+
+    // Hacer la petición
+    const response = await axios.post("https://api.imgbb.com/1/upload", formData, {
       params: {
-        key: process.env.IMGBB_API_KEY, // API Key de ImgBB
+        key: process.env.IMGBB_API_KEY,
+        expiration: 600 // Opcional: 10 minutos de expiración
       },
-      headers: formData.getHeaders(),
+      headers: headers
     });
 
-    // Retornar la URL de la imagen
     return response.data.data.url;
+
   } catch (error) {
-    // Manejo de errores
+    // Manejo detallado de errores
+    let errorMessage = "Error al subir imagen";
+    
     if (error.response) {
-      throw new Error(`Error al subir la imagen: ${error.response.status} - ${error.response.data.error.message}`);
+      const { status, data } = error.response;
+      errorMessage = `ImgBB Error ${status}: ${data.error?.message || "Sin mensaje"}`;
+    } else if (error.request) {
+      errorMessage = "No se recibió respuesta de ImgBB";
     } else {
-      throw new Error(`Error al subir la imagen: ${error.message}`);
+      errorMessage = `Error interno: ${error.message}`;
     }
+
+    throw new Error(errorMessage);
   }
 };
 
