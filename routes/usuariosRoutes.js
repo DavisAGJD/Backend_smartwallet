@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 const usuariosController = require("../controllers/usuariosControllers");
 const { verificarToken } = require("../middleware/authMiddleware");
+const multer = require("multer");
+const upload = multer({ storage: multer.memoryStorage() });
 
 router.get("/", usuariosController.getUsuarios);
 router.get("/info", usuariosController.getInfoUsuarios);
@@ -28,7 +30,13 @@ router.get(
 router.get("/info-user/:id", verificarToken, usuariosController.getUsuarioById);
 
 // Nueva ruta para actualizar la imagen del usuario
-router.put("/update-image/:usuario_id", usuariosController.updateUsuarioImage);
+router.put(
+  "/update-image/:usuario_id",
+  verificarToken,
+  upload.single("image"),
+  usuariosController.updateUsuarioImage
+);
+
 
 // Nueva ruta para obtener datos para la gráfica de usuarios
 router.get("/grafica-usuarios", usuariosController.getGraficaUsuarios);

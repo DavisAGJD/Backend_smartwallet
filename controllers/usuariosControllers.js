@@ -256,38 +256,45 @@ const getPuntosUsuario = (req, res) => {
 };
 
 const updateUsuarioImage = async (req, res) => {
-  const { usuario_id } = req.params;
-
-  // Verifica si el archivo se recibió
-  if (!req.file) {
-    return res.status(400).json({ error: "No se envió ninguna imagen" });
-  }
-
-  console.log("Archivo recibido:", {
-    originalname: req.file.originalname,
-    size: req.file.size,
-  });
-
   try {
-    // Subir imagen a ImgBB
-    const imageUrl = await uploadImageToImgBB(req.file.buffer);
-    console.log("URL de ImgBB:", imageUrl);
+    const { usuario_id } = req.params;
 
-    // Actualizar la base de datos
+    if (!usuario_id) {
+      return res.status(401).json({ error: "Usuario no autenticado" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No se envió ninguna imagen" });
+    }
+
+    const imageUrl = await uploadImageToImgBB(req.file.buffer);
+
     db.query(
       "UPDATE usuarios SET image = ? WHERE usuario_id = ?",
       [imageUrl, usuario_id],
       (err, result) => {
         if (err) {
-          console.error("Error en la base de datos:", err.message);
-          return res.status(500).json({ error: "Error al guardar la imagen" });
+          console.error("Error en BD:", err.message);
+          return res.status(500).json({ error: "Error al actualizar imagen" });
         }
-        res.status(200).json({ imageUrl });
+
+        if (result.affectedRows === 0) {
+          return res.status(404).json({ error: "Usuario no encontrado" });
+        }
+
+        res.status(200).json({
+          message: "Imagen actualizada exitosamente",
+          imageUrl: imageUrl,
+        });
       }
     );
   } catch (error) {
-    console.error("Error en ImgBB:", error.message);
-    res.status(500).json({ error: "Fallo al subir la imagen" });
+    console.error("Error crítico:", error.message);
+    res.status(500).json({
+      error: error.message.startsWith("La imagen")
+        ? error.message
+        : "Error interno al procesar imagen",
+    });
   }
 };
 
