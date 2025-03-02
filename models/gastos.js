@@ -139,6 +139,26 @@ const Gasto = {
       callback(null, result);
     });
   },
+
+  getGastosPorCategoria: (callback) => {
+    const query = `
+      SELECT 
+        u.usuario_id,
+        u.nombre_usuario,
+        c.nombre_categoria,
+        SUM(g.monto) AS total_gastado
+      FROM usuarios u
+      LEFT JOIN gastos g ON u.usuario_id = g.usuario_id
+      LEFT JOIN categorias_gastos c ON g.categoria_gasto_id = c.categoria_gasto_id
+      GROUP BY u.usuario_id, c.categoria_gasto_id
+      ORDER BY u.nombre_usuario, c.nombre_categoria;
+    `;
+
+    db.query(query, (err, results) => {
+      if (err) return callback(err, null);
+      callback(null, results);
+    });
+  },
 };
 
 module.exports = Gasto;
