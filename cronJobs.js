@@ -5,18 +5,16 @@ const {
   generarNotificacionesDeRecordatorios,
   eliminarNotificacionesViejas,
   generarNotificacionesDeMetasVencidas,
-  generarNotificacionesFinancieras,
+  generarNotificacionesFinancieras
 } = require("./controllers/notificacionAutomaticaController");
 
-cron.schedule("*/2 * * * *", async () => {
+cron.schedule("0 0,9,18 * * *", async () => {
   try {
-    console.log(
-      "Ejecutando análisis para generar notificaciones cada 4 horas..."
-    );
+    console.log("Ejecutando análisis para generar notificaciones cada 9 horas...");
     await generarNotificacionesDeGastos();
     await generarNotificacionesDeMetas();
     await generarNotificacionesDeRecordatorios();
-    await generarNotificacionesFinancieras(); // Se corrige el nombre de la función
+    await generarNotificacionesFinancieras();
     console.log("Ejecutando limpieza diaria de notificaciones viejas...");
     await eliminarNotificacionesViejas();
     console.log("Ejecutando análisis para metas vencidas...");
