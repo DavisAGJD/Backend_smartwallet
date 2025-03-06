@@ -1,20 +1,20 @@
-# Usa una imagen base de Node.js
-FROM node:14
+# Usa una imagen base más reciente
+FROM node:18
 
-# Establece el directorio de trabajo en el contenedor
+# Establece el directorio de trabajo
 WORKDIR /usr/src/app
 
-# Copia el archivo package.json y package-lock.json (si lo tienes)
+# Copia y verifica dependencias antes de copiar todo el código
 COPY package*.json ./
 
-# Instala las dependencias
-RUN npm install
+# Instala las dependencias con --omit=dev para evitar paquetes innecesarios en producción
+RUN npm install --omit=dev
 
-# Copia el resto de tu código al contenedor
+# Copia el resto del código
 COPY . .
 
-# Exponer el puerto en el que tu aplicación estará escuchando
+# Exponer el puerto de la aplicación
 EXPOSE 3000
 
-# Comando para iniciar tu aplicación
-CMD ["npm", "start"]
+# Comando para iniciar la aplicación
+CMD ["npm", "start"]
