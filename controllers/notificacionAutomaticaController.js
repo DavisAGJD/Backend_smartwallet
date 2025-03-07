@@ -364,6 +364,7 @@ async function generarNotificacionesFinancieras() {
 // ============================================================================
 // NOTIFICACIONES EXISTENTES (GASTOS, METAS, RECORDATORIOS, ETC.)
 // ============================================================================
+
 async function generarNotificacionesDeGastos() {
   const usuarios = await obtenerUsuarios();
 
@@ -384,18 +385,86 @@ async function generarNotificacionesDeGastos() {
   }
 }
 
+// ==================
+// NOTIFICACIONES DE METAS
+// ==================
+
+// Función para notificar el inicio de una nueva meta
+async function notificarInicioMeta(meta) {
+  await Notificacion.create({
+    usuario_id: meta.usuario_id,
+    tipo: "meta_inicio",
+    mensaje: `Has creado una nueva meta: ${meta.nombre_meta}. ¡Empieza a ahorrar y alcanzar tu objetivo!`
+  });
+}
+
 async function generarNotificacionesDeMetas() {
   const metas = await obtenerMetas();
 
   metas.forEach(async (meta) => {
     const porcentajeMeta = (meta.monto_actual / meta.monto_objetivo) * 100;
 
-    if (porcentajeMeta >= 90) {
+    // Hitos intermedios
+    if (porcentajeMeta >= 25 && porcentajeMeta < 50) {
       await Notificacion.create({
         usuario_id: meta.usuario_id,
-        tipo: "meta",
-        mensaje: `Estás cerca de completar tu meta: ${meta.nombre_meta}.`
+        tipo: "meta_hito",
+        mensaje: `¡Buen inicio! Has alcanzado el 25% de tu meta: ${meta.nombre_meta}. Sigue así.`
       });
+    } else if (porcentajeMeta >= 50 && porcentajeMeta < 75) {
+      await Notificacion.create({
+        usuario_id: meta.usuario_id,
+        tipo: "meta_hito",
+        mensaje: `¡Genial! Has alcanzado el 50% de tu meta: ${meta.nombre_meta}. ¡Sigue avanzando!`
+      });
+    } else if (porcentajeMeta >= 75 && porcentajeMeta < 90) {
+      await Notificacion.create({
+        usuario_id: meta.usuario_id,
+        tipo: "meta_hito",
+        mensaje: `Estás en el 75% de tu meta: ${meta.nombre_meta}. ¡Ya casi lo logras!`
+      });
+    }
+
+    // Felicitación por meta cumplida
+    if (porcentajeMeta >= 100) {
+      await Notificacion.create({
+        usuario_id: meta.usuario_id,
+        tipo: "meta_completada",
+        mensaje: `¡Felicidades! Has alcanzado tu meta: ${meta.nombre_meta}.`
+      });
+    }
+    // Sugerencia personalizada si está cerca (90%-100%)
+    else if (porcentajeMeta >= 90 && porcentajeMeta < 100) {
+      const diferencia = meta.monto_objetivo - meta.monto_actual;
+      await Notificacion.create({
+        usuario_id: meta.usuario_id,
+        tipo: "meta_cerca",
+        mensaje: `Estás cerca de completar tu meta: ${meta.nombre_meta}. Te falta un aporte de \$${diferencia.toFixed(2)} para alcanzarla.`
+      });
+    }
+
+    // Recordatorio de fecha límite (si faltan 7 días o menos y la meta no está completa)
+    const fechaLimite = new Date(meta.fecha_limite);
+    const diffDays = Math.ceil((fechaLimite - new Date()) / (1000 * 60 * 60 * 24));
+    if (diffDays > 0 && diffDays <= 7 && porcentajeMeta < 100) {
+      await Notificacion.create({
+        usuario_id: meta.usuario_id,
+        tipo: "meta_recordatorio",
+        mensaje: `Recuerda que tu meta: ${meta.nombre_meta} vence en ${diffDays} día(s). Considera hacer un aporte extra para alcanzarla.`
+      });
+    }
+
+    // Recordatorio de inactividad (si han pasado 7 días sin aportes)
+    if (meta.ultima_actualizacion) {
+      const ultimaActualizacion = new Date(meta.ultima_actualizacion);
+      const diffInactividad = Math.ceil((new Date() - ultimaActualizacion) / (1000 * 60 * 60 * 24));
+      if (diffInactividad >= 7 && porcentajeMeta < 100) {
+        await Notificacion.create({
+          usuario_id: meta.usuario_id,
+          tipo: "meta_inactividad",
+          mensaje: `No has actualizado tu meta: ${meta.nombre_meta} en más de una semana. ¡Anímate a aportar para mantener el progreso!`
+        });
+      }
     }
   });
 }
@@ -488,7 +557,7 @@ const obtenerGastosDelMes = async (usuarioId) => {
 const obtenerMetas = async () => {
   return new Promise((resolve, reject) => {
     const query = `
-      SELECT meta_id, usuario_id, nombre_meta, monto_objetivo, monto_actual, fecha_limite
+      SELECT meta_id, usuario_id, nombre_meta, monto_objetivo, monto_actual, fecha_limite, ultima_actualizacion
       FROM metas_de_ahorro
     `;
     db.query(query, (err, results) => {
@@ -623,5 +692,6 @@ module.exports = {
   generarNotificacionesDeRecordatorios,
   eliminarNotificacionesViejas,
   generarNotificacionesDeMetasVencidas,
-  generarNotificacionesFinancieras
+  generarNotificacionesFinancieras,
+  notificarInicioMeta
 };
