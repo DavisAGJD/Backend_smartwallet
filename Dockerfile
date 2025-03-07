@@ -6,6 +6,8 @@ WORKDIR /usr/src/app
 
 # Copia y verifica dependencias antes de copiar todo el código
 COPY package*.json ./
+COPY .env .env
+
 
 # Instala las dependencias con --omit=dev para evitar paquetes innecesarios en producción
 RUN npm install --omit=dev
