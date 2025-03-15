@@ -32,8 +32,8 @@ const ESTRATEGIAS = {
       "Planifica recetas que compartan ingredientes para reducir el desperdicio.",
       "Aprovecha la comida cercana a la fecha de vencimiento con descuentos.",
       "Usa un presupuesto fijo mensual para alimentación y mantente dentro del límite.",
-      "Lleva tus propias comidas al trabajo o a la universidad para evitar gastos en cafeterías."
-    ]
+      "Lleva tus propias comidas al trabajo o a la universidad para evitar gastos en cafeterías.",
+    ],
   },
 
   Transporte: {
@@ -58,8 +58,8 @@ const ESTRATEGIAS = {
       "Analiza si un auto propio es realmente necesario o si puedes rentar ocasionalmente.",
       "Si vives cerca de tu trabajo, considera mudarte para reducir tiempo y gastos de transporte.",
       "Evita desplazamientos innecesarios organizando tus actividades desde casa.",
-      "Aprovecha el teletrabajo si es posible para reducir gastos de desplazamiento."
-    ]
+      "Aprovecha el teletrabajo si es posible para reducir gastos de desplazamiento.",
+    ],
   },
 
   Entretenimiento: {
@@ -84,8 +84,8 @@ const ESTRATEGIAS = {
       "Organiza talleres o cursos caseros con amigos para aprender juntos.",
       "Busca entradas de último minuto con descuento para espectáculos.",
       "Sigue redes sociales de centros culturales para enterarte de eventos gratuitos.",
-      "Si eres fan de los videojuegos, considera servicios de suscripción en lugar de comprar cada título."
-    ]
+      "Si eres fan de los videojuegos, considera servicios de suscripción en lugar de comprar cada título.",
+    ],
   },
 
   Educación: {
@@ -110,8 +110,8 @@ const ESTRATEGIAS = {
       "Considera estudios semipresenciales o a distancia para reducir gastos de transporte.",
       "Haz prácticas en empresas que cubran algunos costos de formación.",
       "Sigue canales educativos en redes sociales para aprender gratuitamente.",
-      "Si terminas un curso, vende o intercambia los materiales que ya no necesites."
-    ]
+      "Si terminas un curso, vende o intercambia los materiales que ya no necesites.",
+    ],
   },
 
   Salud: {
@@ -136,8 +136,8 @@ const ESTRATEGIAS = {
       "Cocina en casa platos balanceados en lugar de comer comida rápida.",
       "Revisa si tu empleador ofrece beneficios de salud o planes colectivos.",
       "Si necesitas terapias, pregunta por tarifas especiales o planes de pago.",
-      "Descansa lo suficiente para fortalecer tu sistema inmunológico y reducir gastos médicos."
-    ]
+      "Descansa lo suficiente para fortalecer tu sistema inmunológico y reducir gastos médicos.",
+    ],
   },
 
   Hogar: {
@@ -162,8 +162,8 @@ const ESTRATEGIAS = {
       "Utiliza regletas con interruptor para apagar varios dispositivos a la vez.",
       "Compra muebles de segunda mano en buen estado para ahorrar.",
       "Haz una lista de tareas de mantenimiento para evitar gastos mayores.",
-      "Comparte herramientas con vecinos en lugar de comprarlas todas."
-    ]
+      "Comparte herramientas con vecinos en lugar de comprarlas todas.",
+    ],
   },
 
   Ropa: {
@@ -188,8 +188,8 @@ const ESTRATEGIAS = {
       "Planifica tus compras de ropa según tus necesidades reales.",
       "Mantén tus zapatos en buen estado lustrándolos y guardándolos correctamente.",
       "Considera alquilar ropa elegante para eventos especiales en lugar de comprar.",
-      "Compra prendas versátiles que sirvan para distintas ocasiones."
-    ]
+      "Compra prendas versátiles que sirvan para distintas ocasiones.",
+    ],
   },
 
   Tecnología: {
@@ -214,8 +214,8 @@ const ESTRATEGIAS = {
       "Desactiva notificaciones innecesarias que consumen datos y batería.",
       "Configura tu computadora para que entre en suspensión tras inactividad.",
       "Compra cables y periféricos en tiendas especializadas a mejor precio.",
-      "Renueva componentes en lugar de cambiar todo el equipo cuando sea posible."
-    ]
+      "Renueva componentes en lugar de cambiar todo el equipo cuando sea posible.",
+    ],
   },
 
   Viajes: {
@@ -240,8 +240,8 @@ const ESTRATEGIAS = {
       "Aprovecha el turismo de caminata o bicicleta en destinos naturales.",
       "Consulta blogs de viajeros para descubrir opciones baratas o gratuitas.",
       "Arma un presupuesto diario para comida, transporte y actividades.",
-      "Considera viajar en grupo para dividir gastos de hospedaje y transporte."
-    ]
+      "Considera viajar en grupo para dividir gastos de hospedaje y transporte.",
+    ],
   },
 
   Otros: {
@@ -266,8 +266,8 @@ const ESTRATEGIAS = {
       "Si compras en línea, usa un carrito y espera unos días antes de finalizar la compra.",
       "Establece un sistema de sobres o categorías para administrar tu efectivo.",
       "Crea un presupuesto detallado y revísalo periódicamente.",
-      "Distingue entre necesidades y deseos antes de gastar."
-    ]
+      "Distingue entre necesidades y deseos antes de gastar.",
+    ],
   },
 
   Ticket: {
@@ -292,9 +292,9 @@ const ESTRATEGIAS = {
       "Comparte transporte con amigos para dividir gastos de traslado al evento.",
       "Llega temprano para evitar costos extra de estacionamiento o recargos de última hora.",
       "Si el evento es al aire libre, lleva lo necesario para no comprar dentro a precios altos.",
-      "Revende tu ticket solo en canales oficiales para evitar fraudes o estafas."
-    ]
-  }
+      "Revende tu ticket solo en canales oficiales para evitar fraudes o estafas.",
+    ],
+  },
 };
 
 // ============================================================================
@@ -315,7 +315,9 @@ async function generarRecomendacionesFinancieras(usuario) {
     const estrategia = ESTRATEGIAS[categoria];
     if (estrategia && porcentaje > estrategia.max_porcentaje) {
       const mensajeAleatorio =
-        estrategia.mensajes[Math.floor(Math.random() * estrategia.mensajes.length)];
+        estrategia.mensajes[
+          Math.floor(Math.random() * estrategia.mensajes.length)
+        ];
       recomendaciones.push(
         `[${categoria} - ${porcentaje.toFixed(1)}%] ${mensajeAleatorio}`
       );
@@ -352,7 +354,7 @@ async function generarNotificacionesFinancieras() {
           usuario_id: usuario.usuario_id,
           tipo: "consejo_financiero",
           mensaje:
-            "Consejos de finanzas personales:\n" + recomendaciones.join("\n")
+            "Consejos de finanzas personales:\n" + recomendaciones.join("\n"),
         });
       }
     }
@@ -379,7 +381,7 @@ async function generarNotificacionesDeGastos() {
       await Notificacion.create({
         usuario_id: usuario.usuario_id,
         tipo: "gastos",
-        mensaje: "Has alcanzado el 20% de tu ingreso mensual en gastos."
+        mensaje: "Has alcanzado el 20% de tu ingreso mensual en gastos.",
       });
     }
   }
@@ -394,7 +396,7 @@ async function notificarInicioMeta(meta) {
   await Notificacion.create({
     usuario_id: meta.usuario_id,
     tipo: "meta_inicio",
-    mensaje: `Has creado una nueva meta: ${meta.nombre_meta}. ¡Empieza a ahorrar y alcanzar tu objetivo!`
+    mensaje: `Has creado una nueva meta: ${meta.nombre_meta}. ¡Empieza a ahorrar y alcanzar tu objetivo!`,
   });
 }
 
@@ -409,19 +411,19 @@ async function generarNotificacionesDeMetas() {
       await Notificacion.create({
         usuario_id: meta.usuario_id,
         tipo: "meta_hito",
-        mensaje: `¡Buen inicio! Has alcanzado el 25% de tu meta: ${meta.nombre_meta}. Sigue así.`
+        mensaje: `¡Buen inicio! Has alcanzado el 25% de tu meta: ${meta.nombre_meta}. Sigue así.`,
       });
     } else if (porcentajeMeta >= 50 && porcentajeMeta < 75) {
       await Notificacion.create({
         usuario_id: meta.usuario_id,
         tipo: "meta_hito",
-        mensaje: `¡Genial! Has alcanzado el 50% de tu meta: ${meta.nombre_meta}. ¡Sigue avanzando!`
+        mensaje: `¡Genial! Has alcanzado el 50% de tu meta: ${meta.nombre_meta}. ¡Sigue avanzando!`,
       });
     } else if (porcentajeMeta >= 75 && porcentajeMeta < 90) {
       await Notificacion.create({
         usuario_id: meta.usuario_id,
         tipo: "meta_hito",
-        mensaje: `Estás en el 75% de tu meta: ${meta.nombre_meta}. ¡Ya casi lo logras!`
+        mensaje: `Estás en el 75% de tu meta: ${meta.nombre_meta}. ¡Ya casi lo logras!`,
       });
     }
 
@@ -430,7 +432,7 @@ async function generarNotificacionesDeMetas() {
       await Notificacion.create({
         usuario_id: meta.usuario_id,
         tipo: "meta_completada",
-        mensaje: `¡Felicidades! Has alcanzado tu meta: ${meta.nombre_meta}.`
+        mensaje: `¡Felicidades! Has alcanzado tu meta: ${meta.nombre_meta}.`,
       });
     }
     // Sugerencia personalizada si está cerca (90%-100%)
@@ -439,32 +441,23 @@ async function generarNotificacionesDeMetas() {
       await Notificacion.create({
         usuario_id: meta.usuario_id,
         tipo: "meta_cerca",
-        mensaje: `Estás cerca de completar tu meta: ${meta.nombre_meta}. Te falta un aporte de \$${diferencia.toFixed(2)} para alcanzarla.`
+        mensaje: `Estás cerca de completar tu meta: ${
+          meta.nombre_meta
+        }. Te falta un aporte de \$${diferencia.toFixed(2)} para alcanzarla.`,
       });
     }
 
     // Recordatorio de fecha límite (si faltan 7 días o menos y la meta no está completa)
     const fechaLimite = new Date(meta.fecha_limite);
-    const diffDays = Math.ceil((fechaLimite - new Date()) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.ceil(
+      (fechaLimite - new Date()) / (1000 * 60 * 60 * 24)
+    );
     if (diffDays > 0 && diffDays <= 7 && porcentajeMeta < 100) {
       await Notificacion.create({
         usuario_id: meta.usuario_id,
         tipo: "meta_recordatorio",
-        mensaje: `Recuerda que tu meta: ${meta.nombre_meta} vence en ${diffDays} día(s). Considera hacer un aporte extra para alcanzarla.`
+        mensaje: `Recuerda que tu meta: ${meta.nombre_meta} vence en ${diffDays} día(s). Considera hacer un aporte extra para alcanzarla.`,
       });
-    }
-
-    // Recordatorio de inactividad (si han pasado 7 días sin aportes)
-    if (meta.ultima_actualizacion) {
-      const ultimaActualizacion = new Date(meta.ultima_actualizacion);
-      const diffInactividad = Math.ceil((new Date() - ultimaActualizacion) / (1000 * 60 * 60 * 24));
-      if (diffInactividad >= 7 && porcentajeMeta < 100) {
-        await Notificacion.create({
-          usuario_id: meta.usuario_id,
-          tipo: "meta_inactividad",
-          mensaje: `No has actualizado tu meta: ${meta.nombre_meta} en más de una semana. ¡Anímate a aportar para mantener el progreso!`
-        });
-      }
     }
   });
 }
@@ -478,7 +471,7 @@ async function generarNotificacionesDeMetasVencidas() {
     await Notificacion.create({
       usuario_id: meta.usuario_id,
       tipo: "meta_vencida",
-      mensaje
+      mensaje,
     });
 
     await eliminarMeta(meta.meta_id);
@@ -508,7 +501,7 @@ async function generarNotificacionesDeRecordatorios() {
       await Notificacion.create({
         usuario_id: recordatorio.usuario_id,
         tipo: "recordatorio",
-        mensaje
+        mensaje,
       });
     }
   });
@@ -557,7 +550,7 @@ const obtenerGastosDelMes = async (usuarioId) => {
 const obtenerMetas = async () => {
   return new Promise((resolve, reject) => {
     const query = `
-      SELECT meta_id, usuario_id, nombre_meta, monto_objetivo, monto_actual, fecha_limite, ultima_actualizacion
+      SELECT meta_id, usuario_id, nombre_meta, monto_objetivo, monto_actual, fecha_limite, descripcion, estado_de_meta, categoria_meta_id
       FROM metas_de_ahorro
     `;
     db.query(query, (err, results) => {
@@ -654,7 +647,7 @@ const obtenerUsuariosConGastos = async () => {
                   if (!categoria || !total) return null;
                   return {
                     categoria: categoria.trim(),
-                    total: parseFloat(total) || 0
+                    total: parseFloat(total) || 0,
                   };
                 })
                 .filter((g) => g !== null && g.total > 0)
@@ -664,7 +657,7 @@ const obtenerUsuariosConGastos = async () => {
             usuario_id: row.usuario_id,
             nombre_usuario: row.nombre_usuario,
             ingresos: parseFloat(row.ingresos) || 0,
-            gastos
+            gastos,
           };
         } catch (error) {
           console.error(`Error procesando usuario ${row.usuario_id}:`, error);
@@ -672,7 +665,7 @@ const obtenerUsuariosConGastos = async () => {
             usuario_id: row.usuario_id,
             nombre_usuario: row.nombre_usuario,
             ingresos: parseFloat(row.ingresos) || 0,
-            gastos: []
+            gastos: [],
           };
         }
       });
@@ -693,5 +686,5 @@ module.exports = {
   eliminarNotificacionesViejas,
   generarNotificacionesDeMetasVencidas,
   generarNotificacionesFinancieras,
-  notificarInicioMeta
+  notificarInicioMeta,
 };
