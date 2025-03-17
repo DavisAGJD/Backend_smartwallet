@@ -15,13 +15,14 @@ const obtenerUsuarioConGastos = (usuario_id) => {
         return resolve(null);
       }
       // Se asume que en cada fila se repite el mismo valor de ingresos, por lo que se extrae de la primera fila.
+      const usuario_id_db = userData[0].usuario_id; // Extraemos el usuario_id de la primera fila
       const ingresos = userData[0].ingresos;
       // Se transforma el array de filas en un arreglo de gastos con la información necesaria.
       const gastos = userData.map((row) => ({
         categoria: row.nombre_categoria,
         total: row.total_gastado,
       }));
-      resolve({ ingresos, gastos });
+      resolve({ usuario_id: usuario_id_db, ingresos, gastos });
     });
   });
 };

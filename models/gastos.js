@@ -163,14 +163,14 @@ const Gasto = {
   // Dentro del objeto Gasto, agrega:
   getGastosDelMesPorCategoria: (usuario_id, callback) => {
     const query = `
-      SELECT c.nombre_categoria, SUM(g.monto) AS total_gastado, u.ingresos
+      SELECT u.usuario_id, c.nombre_categoria, SUM(g.monto) AS total_gastado, u.ingresos
       FROM gastos g
       JOIN categorias_gasto c ON g.categoria_gasto_id = c.categoria_gasto_id
       JOIN usuarios u ON g.usuario_id = u.usuario_id
       WHERE g.usuario_id = ?
         AND YEAR(g.fecha) = YEAR(CURRENT_DATE())
         AND MONTH(g.fecha) = MONTH(CURRENT_DATE())
-      GROUP BY c.nombre_categoria, u.ingresos
+      GROUP BY u.usuario_id, c.nombre_categoria, u.ingresos
       ORDER BY c.nombre_categoria;
     `;
     db.query(query, [usuario_id], (err, results) => {

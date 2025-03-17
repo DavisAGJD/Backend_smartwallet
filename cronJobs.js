@@ -12,7 +12,7 @@ const { analizarYNotificarUsuario } = require("./controllers/agenteController");
 cron.schedule("0 */9 * * *", async () => {
   try {
     console.log(
-      "Ejecutando análisis y generación de notificaciones cada 2 minutos..."
+      "Ejecutando análisis y generación de notificaciones cada 9 horas"
     );
 
     await generarNotificacionesDeGastos();
