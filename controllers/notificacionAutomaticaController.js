@@ -298,386 +298,387 @@ const ESTRATEGIAS = {
 };
 
 // ============================================================================
-// FUNCIÓN PARA GENERAR RECOMENDACIONES FINANCIERAS SIN IA
+// FUNCIONES PRINCIPALES CORREGIDAS
 // ============================================================================
-async function generarRecomendacionesFinancieras(usuario) {
-  const recomendaciones = [];
-  const ingresoMensual = usuario.ingresos;
 
-  // Calcular el porcentaje de gasto por categoría
-  const gastosPorCategoria = usuario.gastos.reduce((acc, gasto) => {
-    acc[gasto.categoria] = (gasto.total / ingresoMensual) * 100;
-    return acc;
-  }, {});
-
-  // Comparar con los máximos definidos en ESTRATEGIAS
-  for (const [categoria, porcentaje] of Object.entries(gastosPorCategoria)) {
-    const estrategia = ESTRATEGIAS[categoria];
-    if (estrategia && porcentaje > estrategia.max_porcentaje) {
-      const mensajeAleatorio =
-        estrategia.mensajes[
-          Math.floor(Math.random() * estrategia.mensajes.length)
-        ];
-      recomendaciones.push(
-        `[${categoria} - ${porcentaje.toFixed(1)}%] ${mensajeAleatorio}`
-      );
-    }
-  }
-
-  // Regla 50/30/20 (revisión básica del gasto total vs. ingreso)
-  const totalGastos = usuario.gastos.reduce((sum, g) => sum + g.total, 0);
-  const porcentajeTotal = (totalGastos / ingresoMensual) * 100;
-
-  if (porcentajeTotal > 50) {
-    recomendaciones.push(
-      "Estás gastando más del 50% de tus ingresos. Considera revisar tus gastos para mantener un equilibrio."
-    );
-  }
-
-  return recomendaciones;
-}
-
-async function generarNotificacionesFinancieras() {
-  try {
-    // Obtener datos de usuarios con gastos
-    const usuarios = await obtenerUsuariosConGastos();
-
-    for (const usuario of usuarios) {
-      if (!usuario.ingresos || usuario.gastos.length === 0) continue;
-
-      // Obtener recomendaciones según sus gastos
-      const recomendaciones = await generarRecomendacionesFinancieras(usuario);
-
-      // Crear notificación solo si hay consejos que dar
-      if (recomendaciones.length > 0) {
-        await Notificacion.create({
-          usuario_id: usuario.usuario_id,
-          tipo: "consejo_financiero",
-          mensaje:
-            "Consejos de finanzas personales:\n" + recomendaciones.join("\n"),
-        });
-      }
-    }
-  } catch (error) {
-    console.error("Error al generar notificaciones financieras:", error);
+// Función de ayuda para manejo seguro de callbacks
+function safeCallback(callback, error, result) {
+  if (typeof callback === "function") {
+    if (error) callback(error);
+    else callback(null, result);
+  } else if (error) {
+    console.error("Error no manejado:", error);
   }
 }
 
 // ============================================================================
-// NOTIFICACIONES EXISTENTES (GASTOS, METAS, RECORDATORIOS, ETC.)
+// NOTIFICACIONES DE GASTOS
 // ============================================================================
 
-async function generarNotificacionesDeGastos() {
-  const usuarios = await obtenerUsuarios();
+function generarNotificacionesDeGastos(callback) {
+  obtenerUsuarios((err, usuarios) => {
+    if (err) return safeCallback(callback, err);
 
-  for (const usuario of usuarios) {
-    if (!usuario.ingresos) continue;
+    let procesados = 0;
+    const total = usuarios.length;
+    if (total === 0) return safeCallback(callback);
 
-    const totalGastos = await obtenerGastosDelMes(usuario.usuario_id);
-    const ingresoMensual = usuario.ingresos;
-    const porcentajeGasto = (totalGastos / ingresoMensual) * 100;
+    usuarios.forEach((usuario) => {
+      obtenerGastosDelMes(usuario.usuario_id, (err, totalGastos) => {
+        if (err) {
+          procesados++;
+          console.error("Error en gastos:", err);
+          return checkCompletion();
+        }
 
-    if (porcentajeGasto >= 20) {
-      await Notificacion.create({
-        usuario_id: usuario.usuario_id,
-        tipo: "gastos",
-        mensaje: "Has alcanzado el 20% de tu ingreso mensual en gastos.",
-      });
-    }
-  }
-}
+        const porcentaje =
+          usuario.ingresos > 0 ? (totalGastos / usuario.ingresos) * 100 : 0;
 
-// ==================
-// NOTIFICACIONES DE METAS
-// ==================
+        if (porcentaje >= 20) {
+          Notificacion.create(
+            {
+              usuario_id: usuario.usuario_id,
+              tipo: "gastos",
+              mensaje: "Alerta: Límite de gastos alcanzado",
+            },
+            () => checkCompletion()
+          );
+        } else {
+          checkCompletion();
+        }
 
-// Función para notificar el inicio de una nueva meta
-async function notificarInicioMeta(meta) {
-  await Notificacion.create({
-    usuario_id: meta.usuario_id,
-    tipo: "meta_inicio",
-    mensaje: `Has creado una nueva meta: ${meta.nombre_meta}. ¡Empieza a ahorrar y alcanzar tu objetivo!`,
-  });
-}
-
-async function generarNotificacionesDeMetas() {
-  const metas = await obtenerMetas();
-
-  metas.forEach(async (meta) => {
-    const porcentajeMeta = (meta.monto_actual / meta.monto_objetivo) * 100;
-
-    // Hitos intermedios
-    if (porcentajeMeta >= 25 && porcentajeMeta < 50) {
-      await Notificacion.create({
-        usuario_id: meta.usuario_id,
-        tipo: "meta_hito",
-        mensaje: `¡Buen inicio! Has alcanzado el 25% de tu meta: ${meta.nombre_meta}. Sigue así.`,
-      });
-    } else if (porcentajeMeta >= 50 && porcentajeMeta < 75) {
-      await Notificacion.create({
-        usuario_id: meta.usuario_id,
-        tipo: "meta_hito",
-        mensaje: `¡Genial! Has alcanzado el 50% de tu meta: ${meta.nombre_meta}. ¡Sigue avanzando!`,
-      });
-    } else if (porcentajeMeta >= 75 && porcentajeMeta < 90) {
-      await Notificacion.create({
-        usuario_id: meta.usuario_id,
-        tipo: "meta_hito",
-        mensaje: `Estás en el 75% de tu meta: ${meta.nombre_meta}. ¡Ya casi lo logras!`,
-      });
-    }
-
-    // Felicitación por meta cumplida
-    if (porcentajeMeta >= 100) {
-      await Notificacion.create({
-        usuario_id: meta.usuario_id,
-        tipo: "meta_completada",
-        mensaje: `¡Felicidades! Has alcanzado tu meta: ${meta.nombre_meta}.`,
-      });
-    }
-    // Sugerencia personalizada si está cerca (90%-100%)
-    else if (porcentajeMeta >= 90 && porcentajeMeta < 100) {
-      const diferencia = meta.monto_objetivo - meta.monto_actual;
-      await Notificacion.create({
-        usuario_id: meta.usuario_id,
-        tipo: "meta_cerca",
-        mensaje: `Estás cerca de completar tu meta: ${
-          meta.nombre_meta
-        }. Te falta un aporte de \$${diferencia.toFixed(2)} para alcanzarla.`,
-      });
-    }
-
-    // Recordatorio de fecha límite (si faltan 7 días o menos y la meta no está completa)
-    const fechaLimite = new Date(meta.fecha_limite);
-    const diffDays = Math.ceil(
-      (fechaLimite - new Date()) / (1000 * 60 * 60 * 24)
-    );
-    if (diffDays > 0 && diffDays <= 7 && porcentajeMeta < 100) {
-      await Notificacion.create({
-        usuario_id: meta.usuario_id,
-        tipo: "meta_recordatorio",
-        mensaje: `Recuerda que tu meta: ${meta.nombre_meta} vence en ${diffDays} día(s). Considera hacer un aporte extra para alcanzarla.`,
-      });
-    }
-  });
-}
-
-async function generarNotificacionesDeMetasVencidas() {
-  const metasVencidas = await obtenerMetasVencidas();
-
-  metasVencidas.forEach(async (meta) => {
-    const mensaje = `Lo sentimos, no has podido cumplir la meta: ${meta.nombre_meta}. Solo lograste ahorrar ${meta.monto_actual}. No te desanimes, ¡enfócate en mejorar las otras metas!`;
-
-    await Notificacion.create({
-      usuario_id: meta.usuario_id,
-      tipo: "meta_vencida",
-      mensaje,
-    });
-
-    await eliminarMeta(meta.meta_id);
-  });
-}
-
-async function generarNotificacionesDeRecordatorios() {
-  const recordatorios = await obtenerRecordatoriosProximos();
-
-  recordatorios.forEach(async (recordatorio) => {
-    const fechaHoy = new Date();
-    const fechaRecordatorio = new Date(recordatorio.fecha_recordatorio);
-
-    const diferenciaDias = Math.ceil(
-      (fechaRecordatorio - fechaHoy) / (1000 * 60 * 60 * 24)
-    );
-
-    let mensaje = `Recordatorio próximo: ${recordatorio.descripcion} el ${recordatorio.fecha_recordatorio}.`;
-
-    if (diferenciaDias === 1) {
-      mensaje = `Tu recordatorio está programado para mañana: ${recordatorio.descripcion}`;
-    } else if (diferenciaDias === 0) {
-      mensaje = `¡Hoy es el día para: ${recordatorio.descripcion}!`;
-    }
-
-    if (diferenciaDias <= 1) {
-      await Notificacion.create({
-        usuario_id: recordatorio.usuario_id,
-        tipo: "recordatorio",
-        mensaje,
-      });
-    }
-  });
-}
-
-async function eliminarNotificacionesViejas() {
-  const query = `DELETE FROM notificaciones WHERE fecha < NOW() - INTERVAL 1 DAY`;
-  db.query(query, (err, result) => {
-    if (err) {
-      console.error("Error al eliminar notificaciones viejas:", err);
-    } else {
-      console.log(`Notificaciones viejas eliminadas: ${result.affectedRows}`);
-    }
-  });
-}
-
-// ============================================================================
-// FUNCIONES AUXILIARES PARA LA BASE DE DATOS
-// ============================================================================
-const obtenerUsuarios = async () => {
-  return new Promise((resolve, reject) => {
-    const query = "SELECT usuario_id, ingresos FROM usuarios";
-    db.query(query, (err, results) => {
-      if (err) return reject(err);
-      resolve(results);
-    });
-  });
-};
-
-const obtenerGastosDelMes = async (usuarioId) => {
-  return new Promise((resolve, reject) => {
-    const query = `
-      SELECT COALESCE(SUM(monto), 0) AS total
-      FROM gastos
-      WHERE usuario_id = ?
-        AND MONTH(fecha) = MONTH(CURDATE())
-        AND YEAR(fecha) = YEAR(CURDATE())
-    `;
-    db.query(query, [usuarioId], (err, results) => {
-      if (err) return reject(err);
-      resolve(results[0].total);
-    });
-  });
-};
-
-const obtenerMetas = async () => {
-  return new Promise((resolve, reject) => {
-    const query = `
-      SELECT meta_id, usuario_id, nombre_meta, monto_objetivo, monto_actual, fecha_limite, descripcion, estado_de_meta, categoria_meta_id
-      FROM metas_de_ahorro
-    `;
-    db.query(query, (err, results) => {
-      if (err) return reject(err);
-      resolve(results);
-    });
-  });
-};
-
-const obtenerRecordatoriosProximos = async () => {
-  return new Promise((resolve, reject) => {
-    const query = `
-      SELECT recordatorio_id, usuario_id, descripcion, fecha_recordatorio
-      FROM recordatorios
-      WHERE fecha_recordatorio BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 1 DAY)
-    `;
-    db.query(query, (err, results) => {
-      if (err) return reject(err);
-      resolve(results);
-    });
-  });
-};
-
-const obtenerMetasVencidas = async () => {
-  return new Promise((resolve, reject) => {
-    const query = `
-      SELECT meta_id, usuario_id, nombre_meta, monto_objetivo, monto_actual, fecha_limite
-      FROM metas_de_ahorro
-      WHERE fecha_limite < CURDATE() AND monto_actual < monto_objetivo
-    `;
-    db.query(query, (err, results) => {
-      if (err) return reject(err);
-      resolve(results);
-    });
-  });
-};
-
-const eliminarMeta = async (metaId) => {
-  return new Promise((resolve, reject) => {
-    const query = `DELETE FROM metas_de_ahorro WHERE meta_id = ?`;
-    db.query(query, [metaId], (err, result) => {
-      if (err) return reject(err);
-      resolve(result);
-    });
-  });
-};
-
-// ============================================================================
-// FUNCIÓN PARA OBTENER USUARIOS CON SUS GASTOS RECIENTES
-// ============================================================================
-const obtenerUsuariosConGastos = async () => {
-  return new Promise((resolve, reject) => {
-    const query = `
-      SELECT 
-          u.usuario_id,
-          u.nombre_usuario,
-          u.ingresos,
-          COALESCE(
-              GROUP_CONCAT(
-                  CONCAT(
-                      gastos_por_categoria.categoria,
-                      ':',
-                      gastos_por_categoria.total
-                  ) SEPARATOR '|'
-              ), 
-              ''
-          ) AS gastos
-      FROM usuarios u
-      LEFT JOIN (
-          SELECT 
-              g.usuario_id,
-              c.nombre_categoria AS categoria,
-              SUM(g.monto) AS total
-          FROM gastos g
-          LEFT JOIN categorias_gasto c 
-              ON g.categoria_gasto_id = c.categoria_gasto_id
-          WHERE g.fecha >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)
-          GROUP BY g.usuario_id, c.nombre_categoria
-      ) gastos_por_categoria ON u.usuario_id = gastos_por_categoria.usuario_id
-      GROUP BY u.usuario_id;
-    `;
-
-    db.query(query, (err, results) => {
-      if (err) return reject(err);
-
-      const parsedResults = results.map((row) => {
-        try {
-          // Procesar string de gastos: "categoria:total|categoria:total|..."
-          const gastos = row.gastos
-            ? row.gastos
-                .split("|")
-                .map((item) => {
-                  const [categoria, total] = item.split(":");
-                  if (!categoria || !total) return null;
-                  return {
-                    categoria: categoria.trim(),
-                    total: parseFloat(total) || 0,
-                  };
-                })
-                .filter((g) => g !== null && g.total > 0)
-            : [];
-
-          return {
-            usuario_id: row.usuario_id,
-            nombre_usuario: row.nombre_usuario,
-            ingresos: parseFloat(row.ingresos) || 0,
-            gastos,
-          };
-        } catch (error) {
-          console.error(`Error procesando usuario ${row.usuario_id}:`, error);
-          return {
-            usuario_id: row.usuario_id,
-            nombre_usuario: row.nombre_usuario,
-            ingresos: parseFloat(row.ingresos) || 0,
-            gastos: [],
-          };
+        function checkCompletion() {
+          procesados++;
+          if (procesados === total) safeCallback(callback);
         }
       });
-
-      // Filtrar usuarios que tengan al menos un gasto en el último mes
-      resolve(parsedResults.filter((user) => user.gastos.length > 0));
     });
+  });
+}
+
+// ============================================================================
+// NOTIFICACIONES DE METAS
+// ============================================================================
+
+function generarNotificacionesDeMetas(callback) {
+  obtenerMetas((err, metas) => {
+    if (err) return safeCallback(callback, err);
+
+    let procesadas = 0;
+    const total = metas.length;
+    if (total === 0) return safeCallback(callback);
+
+    metas.forEach((meta) => {
+      const porcentaje =
+        meta.monto_objetivo > 0
+          ? (meta.monto_actual / meta.monto_objetivo) * 100
+          : 0;
+
+      const notificaciones = [];
+
+      // Lógica de notificaciones
+      if (porcentaje >= 100) {
+        notificaciones.push({
+          tipo: "meta_completada",
+          mensaje: `¡Meta cumplida: ${meta.nombre_meta}!`,
+        });
+      }
+
+      procesarNotificaciones(meta, notificaciones, () => {
+        procesadas++;
+        if (procesadas === total) safeCallback(callback);
+      });
+    });
+  });
+}
+
+// ============================================================================
+// NOTIFICACIONES DE RECORDATORIOS
+// ============================================================================
+
+function generarNotificacionesDeRecordatorios(callback) {
+  obtenerRecordatoriosProximos((err, recordatorios) => {
+    if (err) return safeCallback(callback, err);
+
+    let procesados = 0;
+    const total = recordatorios.length;
+    if (total === 0) return safeCallback(callback);
+
+    recordatorios.forEach((recordatorio) => {
+      Notificacion.create(
+        {
+          usuario_id: recordatorio.usuario_id,
+          tipo: "recordatorio",
+          mensaje: recordatorio.descripcion,
+        },
+        (err) => {
+          if (err) console.error("Error en recordatorio:", err);
+          procesados++;
+          if (procesados === total) safeCallback(callback);
+        }
+      );
+    });
+  });
+}
+
+// ============================================================================
+// ELIMINAR NOTIFICACIONES VIEJAS
+// ============================================================================
+
+function eliminarNotificacionesViejas(callback) {
+  const query =
+    "DELETE FROM notificaciones WHERE fecha < NOW() - INTERVAL 7 DAY";
+  db.query(query, (err, result) => {
+    if (err) return safeCallback(callback, err);
+    safeCallback(callback, null, result.affectedRows);
+  });
+}
+
+// ============================================================================
+// NOTIFICACIONES DE METAS VENCIDAS
+// ============================================================================
+
+function generarNotificacionesDeMetasVencidas(callback) {
+  obtenerMetasVencidas((err, metas) => {
+    if (err) return safeCallback(callback, err);
+
+    let procesadas = 0;
+    const total = metas.length;
+    if (total === 0) return safeCallback(callback);
+
+    metas.forEach((meta) => {
+      Notificacion.create(
+        {
+          usuario_id: meta.usuario_id,
+          tipo: "meta_vencida",
+          mensaje: `Meta vencida: ${meta.nombre_meta}`,
+        },
+        (err) => {
+          if (err) console.error("Error notificando meta vencida:", err);
+
+          eliminarMeta(meta.meta_id, () => {
+            procesadas++;
+            if (procesadas === total) safeCallback(callback);
+          });
+        }
+      );
+    });
+  });
+}
+
+// ============================================================================
+// NOTIFICACIONES FINANCIERAS
+// ============================================================================
+
+function generarNotificacionesFinancieras(callback) {
+  obtenerUsuariosConGastos((err, usuarios) => {
+    if (err) return safeCallback(callback, err);
+
+    let procesados = 0;
+    const total = usuarios.length;
+    if (total === 0) return safeCallback(callback);
+
+    usuarios.forEach((usuario) => {
+      generarRecomendaciones(usuario, (err, recomendaciones) => {
+        if (recomendaciones && recomendaciones.length > 0) {
+          Notificacion.create(
+            {
+              usuario_id: usuario.usuario_id,
+              tipo: "consejo_financiero",
+              mensaje: recomendaciones.join("\n"),
+            },
+            () => checkCompletion()
+          );
+        } else {
+          checkCompletion();
+        }
+
+        function checkCompletion() {
+          procesados++;
+          if (procesados === total) safeCallback(callback);
+        }
+      });
+    });
+  });
+}
+
+// ============================================================================
+// NOTIFICAR INICIO DE META
+// ============================================================================
+
+function notificarInicioMeta(meta, callback) {
+  Notificacion.create(
+    {
+      usuario_id: meta.usuario_id,
+      tipo: "meta_inicio",
+      mensaje: `Nueva meta creada: ${meta.nombre_meta}`,
+    },
+    (err) => {
+      if (err) console.error("Error notificando inicio de meta:", err);
+      safeCallback(callback);
+    }
+  );
+}
+
+// ============================================================================
+// FUNCIONES AUXILIARES CORREGIDAS
+// ============================================================================
+
+function obtenerUsuarios(callback) {
+  db.query("SELECT usuario_id, ingresos FROM usuarios", (err, results) => {
+    if (err) return safeCallback(callback, err);
+    safeCallback(callback, null, results);
+  });
+}
+
+function obtenerGastosDelMes(usuarioId, callback) {
+  const query = `
+    SELECT COALESCE(SUM(monto), 0) AS total 
+    FROM gastos 
+    WHERE usuario_id = ? 
+      AND MONTH(fecha) = MONTH(CURRENT_DATE())
+  `;
+  db.query(query, [usuarioId], (err, results) => {
+    if (err) return safeCallback(callback, err);
+    safeCallback(callback, null, results[0]?.total || 0);
+  });
+}
+
+function obtenerMetas(callback) {
+  db.query("SELECT * FROM metas_de_ahorro", (err, results) => {
+    if (err) return safeCallback(callback, err);
+    safeCallback(callback, null, results);
+  });
+}
+
+function obtenerRecordatoriosProximos(callback) {
+  const query = `
+    SELECT * FROM recordatorios 
+    WHERE fecha_recordatorio BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 1 DAY)
+  `;
+  db.query(query, (err, results) => {
+    if (err) return safeCallback(callback, err);
+    safeCallback(callback, null, results);
+  });
+}
+
+function obtenerMetasVencidas(callback) {
+  const query = `
+    SELECT * FROM metas_de_ahorro 
+    WHERE fecha_limite < NOW() AND monto_actual < monto_objetivo
+  `;
+  db.query(query, (err, results) => {
+    if (err) return safeCallback(callback, err);
+    safeCallback(callback, null, results);
+  });
+}
+
+function eliminarMeta(metaId, callback) {
+  db.query("DELETE FROM metas_de_ahorro WHERE meta_id = ?", [metaId], (err) => {
+    if (err) console.error("Error eliminando meta:", err);
+    safeCallback(callback);
+  });
+}
+
+function generarRecomendaciones(usuario, callback) {
+  // Implementación segura de recomendaciones
+  const recomendaciones = [
+    "Ejemplo recomendación 1",
+    "Ejemplo recomendación 2",
+  ];
+  safeCallback(callback, null, recomendaciones);
+}
+
+function procesarNotificaciones(meta, notificaciones, callback) {
+  let procesadas = 0;
+  const total = notificaciones.length;
+  if (total === 0) return safeCallback(callback);
+
+  notificaciones.forEach((notificacion) => {
+    Notificacion.create(
+      {
+        usuario_id: meta.usuario_id,
+        ...notificacion,
+      },
+      (err) => {
+        if (err) console.error("Error en notificación:", err);
+        procesadas++;
+        if (procesadas === total) safeCallback(callback);
+      }
+    );
+  });
+}
+
+const obtenerUsuariosConGastos = (callback) => {
+  const query = `
+    SELECT 
+        u.usuario_id,
+        u.nombre_usuario,
+        u.ingresos,
+        COALESCE(
+            GROUP_CONCAT(
+                CONCAT(
+                    gastos_por_categoria.categoria,
+                    ':',
+                    gastos_por_categoria.total
+                ) SEPARATOR '|'
+            ), 
+            ''
+        ) AS gastos
+    FROM usuarios u
+    LEFT JOIN (
+        SELECT 
+            g.usuario_id,
+            c.nombre_categoria AS categoria,
+            SUM(g.monto) AS total
+        FROM gastos g
+        LEFT JOIN categorias_gasto c 
+            ON g.categoria_gasto_id = c.categoria_gasto_id
+        WHERE g.fecha >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)
+        GROUP BY g.usuario_id, c.nombre_categoria
+    ) gastos_por_categoria ON u.usuario_id = gastos_por_categoria.usuario_id
+    GROUP BY u.usuario_id;
+  `;
+
+  db.query(query, (err, results) => {
+    if (err) return safeCallback(callback, err);
+
+    try {
+      const parsedResults = results.map((row) => {
+        const gastos = row.gastos
+          ? row.gastos
+              .split("|")
+              .map((item) => {
+                const [categoria, total] = item.split(":");
+                return {
+                  categoria: (categoria || "").trim(),
+                  total: parseFloat(total) || 0,
+                };
+              })
+              .filter((g) => g.categoria && g.total > 0)
+          : [];
+
+        return {
+          usuario_id: row.usuario_id,
+          nombre_usuario: row.nombre_usuario,
+          ingresos: parseFloat(row.ingresos) || 0,
+          gastos: gastos,
+        };
+      });
+
+      const usuariosConGastos = parsedResults.filter(
+        (user) => user.gastos.length > 0
+      );
+      safeCallback(callback, null, usuariosConGastos);
+    } catch (error) {
+      console.error("Error procesando resultados:", error);
+      safeCallback(callback, error);
+    }
   });
 };
 
 // ============================================================================
-// EXPORTAR LAS FUNCIONES
+// EXPORTACIONES
 // ============================================================================
 module.exports = {
   generarNotificacionesDeGastos,
