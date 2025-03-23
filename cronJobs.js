@@ -9,7 +9,7 @@ const {
 } = require("./controllers/notificacionAutomaticaController");
 const { analizarYNotificarUsuario } = require("./controllers/agenteController");
 
-cron.schedule("0 * * * *", async () => {
+cron.schedule("0 */9 * * *", async () => {
   try {
     console.log(
       "Ejecutando análisis y generación de notificaciones cada 9 horas"
