@@ -11,9 +11,9 @@ const createPaymentIntent = async (req, res) => {
       customer = await stripe.customers.create({
         name: name,
         email: email,
-        payment_method: paymentMethodId, // Asociar el método de pago
+        payment_method: paymentMethodId,
         invoice_settings: {
-          default_payment_method: paymentMethodId, // Método de pago por defecto
+          default_payment_method: paymentMethodId,
         },
       });
     } else {
@@ -30,23 +30,23 @@ const createPaymentIntent = async (req, res) => {
 
     // Crear un PaymentIntent con Stripe
     const paymentIntent = await stripe.paymentIntents.create({
-      amount, // Monto en centavos (ejemplo: 1000 = $10.00)
-      currency, // 'mxn' para pesos mexicanos
-      payment_method: paymentMethodId, // ID del PaymentMethod
-      customer: customer.id, // Asociar el Customer
-      confirm: true, // Confirmar el pago automáticamente
-      payment_method_types: ["card"], // Solo tarjetas
-      description: `Pago de suscripción para ${name} (${email})`, // Descripción del pago
+      amount,
+      currency,
+      payment_method: paymentMethodId,
+      customer: customer.id,
+      confirm: true,
+      payment_method_types: ["card"],
+      description: `Pago de suscripción para ${name} (${email})`,
       metadata: {
-        customer_name: name, // Nombre del cliente
-        customer_email: email, // Correo electrónico del cliente
+        customer_name: name,
+        customer_email: email,
       },
     });
 
     // Devolver el clientSecret y el customerId al frontend
     res.json({
       clientSecret: paymentIntent.client_secret,
-      customerId: customer.id, // Enviar el customerId para futuras renovaciones
+      customerId: customer.id,
     });
   } catch (error) {
     // Manejar errores

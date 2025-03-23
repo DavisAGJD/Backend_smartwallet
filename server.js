@@ -3,17 +3,22 @@ const app = express();
 require("dotenv").config();
 const fetch = (...args) =>
   import("node-fetch").then(({ default: fetch }) => fetch(...args));
-const multer = require("multer"); 
+const multer = require("multer");
 const cors = require("cors");
+const helmet = require("helmet");
+const morgan = require("morgan");
 require("./cronJobs");
 
-// Puerto y claves de Stripe
-const port = process.env.PORT;
-const NEWS_API_KEY = process.env.NEWSDATA_API_KEY;
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY; // Agregado para Stripe
-const stripe = require("stripe")(STRIPE_SECRET_KEY);    // Importación de Stripe
+// Validar variables de entorno
+if (!process.env.PORT || !process.env.NEWSDATA_API_KEY || !process.env.STRIPE_SECRET_KEY) {
+  console.error("Faltan variables de entorno necesarias.");
+  process.exit(1);
+}
 
-// Configuración de multer (subida de archivos)
+// Configuración de Stripe
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+
+// Configuración de multer
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -21,7 +26,20 @@ const upload = multer({
   },
 });
 
-// Importa tus rutas existentes
+// Middlewares
+app.use(helmet());
+app.use(morgan("dev"));
+app.use(
+  cors({
+    origin: ["https://smartwallet-front.vercel.app", "http://localhost:3000"],
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  })
+);
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// Rutas
 const usuariosRoutes = require("./routes/usuariosRoutes");
 const categoriasMetasRoutes = require("./routes/categoriasMetasRoutes");
 const categoriasGastosRoutes = require("./routes/categoriasGastosRoutes");
@@ -31,23 +49,8 @@ const recordatoriosRoutes = require("./routes/recordatoriosRoutes");
 const reportesRoutes = require("./routes/reportesRoutes");
 const ingresoRoutes = require("./routes/ingresoRoutes");
 const notificacionesRoutes = require("./routes/notificacionesRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
 
-// Importa el controlador de Stripe
-const paymentRoutes = require("./routes/paymentRoutes");  // <-- Agregado para Stripe
-
-// Configuración de CORS
-app.use(
-  cors({
-    origin: "https://smartwallet-front.vercel.app", // Cambia este URL por el dominio de tu frontend
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials: true, // Para cookies o sesiones
-  })
-);
-app.use(express.json());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
-
-// Asignación de rutas
 app.use("/api/usuarios", usuariosRoutes);
 app.use("/api/categoriasMetas", categoriasMetasRoutes);
 app.use("/api/categoriasGastos", categoriasGastosRoutes);
@@ -57,22 +60,16 @@ app.use("/api/recordatorios", recordatoriosRoutes);
 app.use("/api/reportes", reportesRoutes);
 app.use("/api/ingresos", ingresoRoutes);
 app.use("/api/notificaciones", notificacionesRoutes);
-app.use("/api/payments", paymentRoutes);  // <-- Nueva ruta para Stripe
+app.use("/api/payments", paymentRoutes);
 
-// Ruta para obtener artículos de NewsData.io
+// Ruta para obtener artículos
 app.get("/api/articles", async (req, res) => {
   const { keyword = "finance" } = req.query;
-  const url = `https://newsdata.io/api/1/news?apikey=${NEWS_API_KEY}&q=${keyword}&language=es`;
+  const url = `https://newsdata.io/api/1/news?apikey=${process.env.NEWSDATA_API_KEY}&q=${keyword}&language=es`;
 
   try {
-    console.log("Solicitando artículos de NewsData.io:", url);
     const response = await fetch(url);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Error fetching articles: ${errorText}`);
-    }
-
+    if (!response.ok) throw new Error(`Error fetching articles: ${await response.text()}`);
     const data = await response.json();
     res.json(data.results);
   } catch (error) {
@@ -81,7 +78,18 @@ app.get("/api/articles", async (req, res) => {
   }
 });
 
-// Configuración del puerto del servidor
-app.listen(port, () => {
-  console.log(`Servidor en ejecución en http://localhost:${port}`);
+// Manejo de errores
+app.use((err, req, res, next) => {
+  console.error("Error no manejado:", err);
+  res.status(500).json({ error: "Algo salió mal en el servidor" });
+});
+
+// Ruta no encontrada
+app.use((req, res) => {
+  res.status(404).json({ error: "Ruta no encontrada" });
+});
+
+// Iniciar servidor
+app.listen(process.env.PORT, () => {
+  console.log(`Servidor en ejecución en http://localhost:${process.env.PORT}`);
 });
