@@ -2,7 +2,8 @@
 node_modules/
 
 # Environment variables (en producción, usa una variable de entorno real)
-.env
+
+
 
 # Logs
 logs/
